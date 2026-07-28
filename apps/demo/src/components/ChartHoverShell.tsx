@@ -9,7 +9,7 @@
 import {
   useState, useCallback, type ReactNode,
 } from 'react';
-import type { VizEvent } from 'react-viz-composer';
+import type { VizEvent } from '@react-viz-composer/core';
 
 interface TooltipState {
   visible: boolean;

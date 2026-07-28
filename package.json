@@ -7,9 +7,12 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/demo",
-    "build": "npm run build -w packages/react-viz-composer",
+    "build": "npm run build -w packages/core && npm run build -w packages/components && npm run build -w packages/charts",
+    "build:core": "npm run build -w packages/core",
+    "build:components": "npm run build -w packages/components",
+    "build:charts": "npm run build -w packages/charts",
     "build:demo": "npm run build -w apps/demo",
-    "lint": "npm run lint -w packages/react-viz-composer",
+    "lint": "npm run lint -w packages/core",
     "typecheck": "tsc -b",
     "preview": "npm run preview -w apps/demo"
   }

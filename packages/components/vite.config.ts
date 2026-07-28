@@ -6,11 +6,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: {
-        index: resolve(__dirname, 'src/index.ts'),
-        'charts/index': resolve(__dirname, 'src/charts/index.ts'),
-        'charts/mockData': resolve(__dirname, 'src/charts/mockData.ts'),
-      },
+      entry: resolve(__dirname, 'src/index.ts'),
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
@@ -19,8 +15,6 @@ export default defineConfig({
         'react-dom',
         'react/jsx-runtime',
         '@react-viz-composer/core',
-        '@react-viz-composer/components',
-        '@react-viz-composer/charts',
       ],
       output: {
         exports: 'named',

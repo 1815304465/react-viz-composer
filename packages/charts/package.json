@@ -1,0 +1,48 @@
+{
+  "name": "@react-viz-composer/charts",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./mockData": {
+      "development": "./src/mockData.ts",
+      "import": "./dist/mockData.js",
+      "require": "./dist/mockData.cjs",
+      "types": "./dist/mockData.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "dev": "vite build --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "@react-viz-composer/core": "*",
+    "@react-viz-composer/components": "*"
+  },
+  "devDependencies": {
+    "@react-viz-composer/core": "*",
+    "@react-viz-composer/components": "*",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "@vitejs/plugin-react": "^6.0.3"
+  }
+}

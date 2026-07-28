@@ -1,7 +1,7 @@
 {
-  "name": "react-viz-composer",
+  "name": "@react-viz-composer/components",
   "version": "0.1.0",
-  "description": "Declarative SVG/Canvas hybrid rendering engine. Compose visualizations from Rect, Ellipse, Line, Path, Text, Image, Group, Animation primitives — with 48 built-in chart types.",
+  "description": "Chart building blocks for ReactVizComposer — ChartFrame, Axis, scales, palette, and entry animation helpers",
   "license": "MIT",
   "author": "tycho",
   "repository": {
@@ -18,12 +18,9 @@
     "chart",
     "svg",
     "canvas",
-    "declarative",
-    "renderer",
-    "2d",
     "dataviz",
     "charts",
-    "graph"
+    "chart-components"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
@@ -31,25 +28,15 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
-    },
-    "./charts": {
-      "import": "./dist/charts/index.js",
-      "require": "./dist/charts/index.cjs",
-      "types": "./dist/charts/index.d.ts"
-    },
-    "./charts/shared/mockData": {
-      "import": "./dist/charts/mockData.js",
-      "require": "./dist/charts/mockData.cjs",
-      "types": "./dist/charts/mockData.d.ts"
     }
   },
   "files": [
     "dist",
-    "README.md",
-    "LICENSE"
+    "README.md"
   ],
   "sideEffects": false,
   "scripts": {
@@ -58,16 +45,13 @@
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@react-viz-composer/core": "*",
-    "@react-viz-composer/components": "*",
-    "@react-viz-composer/charts": "*"
-  },
   "peerDependencies": {
     "react": ">=18.0.0",
-    "react-dom": ">=18.0.0"
+    "react-dom": ">=18.0.0",
+    "@react-viz-composer/core": "*"
   },
   "devDependencies": {
+    "@react-viz-composer/core": "*",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "typescript": "~6.0.2",

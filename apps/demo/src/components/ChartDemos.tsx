@@ -16,7 +16,7 @@ import {
   DensityCloudChart, ContourChart, CurvatureCombChart, HorizontalBarChart,
   StackedBarChart, StackedAreaChart, StepLineChart, SmoothLineChart,
   DoughnutChart, SingleAxisScatterChart, BidirectionalBarChart,
-} from 'react-viz-composer/charts';
+} from '@react-viz-composer/charts';
 import {
   barData, lineData, lineCategories, scatterData,
   areaData, areaCategories, pieData, radarData,
@@ -34,7 +34,7 @@ import {
   stepLineData, stepLineCategories,
   smoothLineData, smoothLineCategories,
   doughnutData, singleAxisScatterData, bidirectionalBarData,
-} from 'react-viz-composer/charts/shared/mockData';
+} from '@react-viz-composer/components';
 import { forceLayout } from './forceLayout';
 
 /* ==================== 原有 Demo（不变） ==================== */

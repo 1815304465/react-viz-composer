@@ -1,57 +1,30 @@
 /**
  * react-viz-composer —— 声明式 SVG/Canvas 混合渲染引擎
  *
- * 入口文件：导出根组件、所有形状组件、类型、引擎和 Context hooks
+ * 入口文件：统一 re-export @react-viz-composer/core + charts
+ * 这是向后兼容的 umbrella 包，推荐直接使用
+ *   - @react-viz-composer/core → 渲染引擎 + 基础形状
+ *   - @react-viz-composer/components → 半成品图表构件
+ *   - @react-viz-composer/charts → 48 个完整图表
  */
 
-// 根组件
-export { default as ReactVizComposer } from './ReactVizComposer';
-export { default } from './ReactVizComposer';
-
-// 形状组件
-export { Rect } from './shapes/geometries/Rect';
-export { Ellipse } from './shapes/geometries/Ellipse';
-export { Line } from './shapes/geometries/Line';
-export { Path } from './shapes/geometries/Path';
-export { Text } from './shapes/geometries/Text';
-export { Image } from './shapes/geometries/Image';
-
-// 定义类组件
-export { LinearGradient } from './shapes/definitions/LinearGradient';
-export { RadialGradient } from './shapes/definitions/RadialGradient';
-export { ClipPath } from './shapes/definitions/ClipPath';
-export { Filter } from './shapes/definitions/Filter';
-export { Mask } from './shapes/definitions/Mask';
-
-// 容器组件
-export { Group } from './shapes/containers/Group';
-export { Animation } from './shapes/containers/Animation';
-
-// 通用类型
-export type {
-  AnimStep, AnimAttribute, AnimEasing, AnimationHandle,
-  ViewportCullMargin, Viewport,
-  RectData, EllipseData, LineData, PathData, TextData, ImageData,
-  GroupData, AnimationData, ElementData, ElementType,
-  Transform, Point, EngineType,
-  GradientStop, LinearGradientData, RadialGradientData,
-  ClipPathData, FilterData, FilterEffect, MaskData, MaskMode,
-  GraphOptions, ElementRecord,
-} from './engine/types';
-
-export { VizEvent } from './engine/types';
-export type { VizEventType, VizEventHandler, VizDragEvent, VizDragEventHandler } from './engine/types';
-
-// 事件类型
-export type { ShapeEventProps } from './shapes/events';
-
-// 引擎（高级用户）
-export { Model, Graph, SceneTree, EventSystem } from './engine';
-export type { SceneNode, SceneListener, SceneChangeReason } from './engine';
-export { CanvasRenderer, SVGRenderer, Renderer } from './engine';
-
-// Context hooks
+// Re-export everything from core
 export {
+  default as ReactVizComposer,
+  default,
+  Rect,
+  Ellipse,
+  Line,
+  Path,
+  Text,
+  Image,
+  LinearGradient,
+  RadialGradient,
+  ClipPath,
+  Filter,
+  Mask,
+  Group,
+  Animation,
   useViz,
   useVizFrame,
   useParentId,
@@ -59,5 +32,54 @@ export {
   useRegisterNode,
   useAnimAttrs,
   applyAnimAttrs,
-} from './context';
-export type { IVizContext, IVizFrameContext } from './context';
+  VizEvent,
+  Model,
+  Graph,
+  SceneTree,
+  EventSystem,
+  CanvasRenderer,
+  SVGRenderer,
+  Renderer,
+} from '@react-viz-composer/core';
+
+export type {
+  AnimStep,
+  AnimAttribute,
+  AnimEasing,
+  AnimationHandle,
+  ViewportCullMargin,
+  Viewport,
+  RectData,
+  EllipseData,
+  LineData,
+  PathData,
+  TextData,
+  ImageData,
+  GroupData,
+  AnimationData,
+  ElementData,
+  ElementType,
+  Transform,
+  Point,
+  EngineType,
+  GradientStop,
+  LinearGradientData,
+  RadialGradientData,
+  ClipPathData,
+  FilterData,
+  FilterEffect,
+  MaskData,
+  MaskMode,
+  GraphOptions,
+  ElementRecord,
+  VizEventType,
+  VizEventHandler,
+  VizDragEvent,
+  VizDragEventHandler,
+  ShapeEventProps,
+  SceneNode,
+  SceneListener,
+  SceneChangeReason,
+  IVizContext,
+  IVizFrameContext,
+} from '@react-viz-composer/core';

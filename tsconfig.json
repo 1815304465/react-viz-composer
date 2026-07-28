@@ -1,7 +1,9 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/react-viz-composer" },
+    { "path": "./packages/core" },
+    { "path": "./packages/components" },
+    { "path": "./packages/charts" },
     { "path": "./apps/demo" }
   ]
 }

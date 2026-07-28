@@ -1,6 +1,6 @@
+import { resolve } from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -8,8 +8,7 @@ export default defineConfig({
     lib: {
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
-        'charts/index': resolve(__dirname, 'src/charts/index.ts'),
-        'charts/mockData': resolve(__dirname, 'src/charts/mockData.ts'),
+        mockData: resolve(__dirname, 'src/mockData.ts'),
       },
       formats: ['es', 'cjs'],
     },
@@ -20,17 +19,10 @@ export default defineConfig({
         'react/jsx-runtime',
         '@react-viz-composer/core',
         '@react-viz-composer/components',
-        '@react-viz-composer/charts',
       ],
       output: {
         exports: 'named',
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
-        },
       },
     },
-    outDir: 'dist',
-    emptyOutDir: true,
   },
 });
