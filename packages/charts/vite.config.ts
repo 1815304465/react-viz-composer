@@ -19,6 +19,7 @@ export default defineConfig({
         'react/jsx-runtime',
         '@react-viz-composer/core',
         '@react-viz-composer/components',
+        '@react-viz-composer/utilities',
       ],
       output: {
         exports: 'named',

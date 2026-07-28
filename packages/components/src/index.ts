@@ -1,10 +1,31 @@
 /**
  * @react-viz-composer/components
  *
- * Chart building blocks — ChartFrame, Axis, scales, palette, entry progress helpers.
+ * Chart building blocks — ChartFrame, Axis, hooks, and re-exports from utilities.
  */
 
-// ChartFrame
+// ── Re-export pure utilities ──
+export {
+  scaleLinear,
+  scaleBand,
+  CATEGORY_12,
+  SEMANTIC_6,
+  KLINE_UP,
+  KLINE_DOWN,
+  AXIS_COLOR,
+  GRID_COLOR,
+  TEXT_COLOR,
+  TEXT_LIGHT,
+  colorAt,
+  easeOutCubic,
+  animValue,
+  animSize,
+  hoverStrokeWidth,
+  hoverOpacity,
+} from '@react-viz-composer/utilities';
+export type { LinearScale, BandScale } from '@react-viz-composer/utilities';
+
+// ── ChartFrame ──
 export {
   ChartFrame,
   PLOT_WIDTH,
@@ -16,57 +37,32 @@ export {
   COLORS,
 } from './shared/ChartFrame';
 
-// ExplorableChartFrame
+// ── ExplorableChartFrame ──
 export {
   ExplorableChartFrame,
   EXPLORE_WIDTH,
   EXPLORE_HEIGHT,
 } from './shared/ExplorableChartFrame';
 
-// Axis & Grid
+// ── Axis & Grid ──
 export { Axis, Grid } from './shared/Axis';
 
-// Scales
-export {
-  scaleLinear,
-  scaleBand,
-} from './shared/scales';
-export type { LinearScale, BandScale } from './shared/scales';
-
-// Palette
-export {
-  CATEGORY_12,
-  SEMANTIC_6,
-  KLINE_UP,
-  KLINE_DOWN,
-  AXIS_COLOR,
-  GRID_COLOR,
-  TEXT_COLOR,
-  TEXT_LIGHT,
-  colorAt,
-} from './shared/palette';
-
-// Chart events (hover)
+// ── Chart events (hover) ──
 export {
   useChartItemHover,
-  hoverStrokeWidth,
-  hoverOpacity,
   itemHoverProps,
 } from './shared/chartEvents';
 export type { ChartItemHoverProps } from './shared/chartEvents';
 
-// Entry progress
+// ── Entry progress ──
 export {
   ChartEntryProgressProvider,
   useEntryProgress,
-  animValue,
-  animSize,
-  easeOutCubic,
   createEntryProgressStore,
 } from './shared/useEntryProgress';
 export type { EntryProgressStore } from './shared/useEntryProgress';
 
-// Mock data
+// ── Mock data ──
 export {
   barData,
   lineData,

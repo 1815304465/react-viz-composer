@@ -7,7 +7,8 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/demo",
-    "build": "npm run build -w packages/core && npm run build -w packages/components && npm run build -w packages/charts",
+    "build": "npm run build -w packages/utilities && npm run build -w packages/core && npm run build -w packages/components && npm run build -w packages/charts",
+    "build:utilities": "npm run build -w packages/utilities",
     "build:core": "npm run build -w packages/core",
     "build:components": "npm run build -w packages/components",
     "build:charts": "npm run build -w packages/charts",

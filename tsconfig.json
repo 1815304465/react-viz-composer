@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "./packages/utilities" },
     { "path": "./packages/core" },
     { "path": "./packages/components" },
     { "path": "./packages/charts" },

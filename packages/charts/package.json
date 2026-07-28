@@ -34,11 +34,13 @@
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
     "@react-viz-composer/core": "*",
-    "@react-viz-composer/components": "*"
+    "@react-viz-composer/components": "*",
+    "@react-viz-composer/utilities": "*"
   },
   "devDependencies": {
     "@react-viz-composer/core": "*",
     "@react-viz-composer/components": "*",
+    "@react-viz-composer/utilities": "*",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "typescript": "~6.0.2",

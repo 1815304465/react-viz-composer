@@ -7,7 +7,7 @@
 import type { ReactNode } from 'react';
 import ReactVizComposer from '@react-viz-composer/core';
 import { ChartEntryProgressProvider, useEntryProgress } from './useEntryProgress.ts';
-import { AXIS_COLOR, GRID_COLOR, TEXT_LIGHT } from './palette';
+import { AXIS_COLOR, GRID_COLOR, TEXT_LIGHT } from '@react-viz-composer/utilities';
 
 export const CHART_WIDTH = 600;
 export const CHART_HEIGHT = 400;

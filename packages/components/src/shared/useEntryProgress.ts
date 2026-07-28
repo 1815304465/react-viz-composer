@@ -8,11 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useVizFrame } from '@react-viz-composer/core';
-
-/** easeOutCubic：起步更柔、末端减速 */
-export function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
+import { easeOutCubic } from '@react-viz-composer/utilities';
 
 /** 入场进度外部 store */
 export interface EntryProgressStore {
@@ -106,27 +102,4 @@ export function ChartEntryProgressProvider(props: ProviderProps) {
 export function useEntryProgress(): number {
   const store = useContext(EntryProgressStoreContext);
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
-}
-
-/** 将 progress 限制在 0~1 */
-function clampProgress(progress: number): number {
-  return Math.max(0, Math.min(1, progress));
-}
-
-/**
- * 将数值按入场进度从 0 插值到目标值
- * @param value 目标值
- * @param progress 0~1
- */
-export function animValue(value: number, progress: number): number {
-  return value * clampProgress(progress);
-}
-
-/**
- * 尺寸类属性插值，保证非负
- * @param value 目标尺寸
- * @param progress 0~1
- */
-export function animSize(value: number, progress: number): number {
-  return Math.max(0, value * clampProgress(progress));
 }

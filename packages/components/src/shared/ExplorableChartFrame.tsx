@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react';
 import ReactVizComposer from '@react-viz-composer/core';
 import { ChartEntryProgressProvider, useEntryProgress } from './useEntryProgress.ts';
-import { GRID_COLOR } from './palette';
+import { GRID_COLOR } from '@react-viz-composer/utilities';
 import { CHART_DEFAULT_VIEWPORT } from './ChartFrame';
 
 export const EXPLORE_WIDTH = 720;

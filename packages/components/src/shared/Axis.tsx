@@ -8,8 +8,8 @@
 
 import { Fragment } from 'react';
 import { Line, Text } from '@react-viz-composer/core';
-import type { LinearScale, BandScale } from './scales';
-import { AXIS_COLOR, TEXT_COLOR } from './palette';
+import { AXIS_COLOR, TEXT_COLOR } from '@react-viz-composer/utilities';
+import type { LinearScale, BandScale } from '@react-viz-composer/utilities';
 import { PLOT_WIDTH, PLOT_HEIGHT } from './ChartFrame';
 
 type Scale = LinearScale | BandScale;

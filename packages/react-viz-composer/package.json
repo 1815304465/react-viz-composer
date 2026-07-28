@@ -61,7 +61,8 @@
   "dependencies": {
     "@react-viz-composer/core": "*",
     "@react-viz-composer/components": "*",
-    "@react-viz-composer/charts": "*"
+    "@react-viz-composer/charts": "*",
+    "@react-viz-composer/utilities": "*"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
