@@ -1,0 +1,186 @@
+# ⚡ ReactVizComposer
+
+声明式 SVG/Canvas 混合渲染引擎。将可视化拆解为 `Rect`、`Ellipse`、`Line`、`Path`、`Text`、`Image`、`Group`、`Animation` 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。内置 48 种图表，覆盖 ECharts 全部常见品类。
+
+[![npm version](https://img.shields.io/npm/v/react-viz-composer)](https://www.npmjs.com/package/react-viz-composer)
+[![license](https://img.shields.io/npm/l/react-viz-composer)](./LICENSE)
+
+## ✨ 特性
+
+- **声明式数据驱动** — 写 JSX 描述形状，引擎负责渲染
+- **SVG/Canvas 双引擎** — `engine="svg"` 增量 DOM 更新，`engine="canvas"` 全量重绘 + 视口裁剪
+- **48 种内置图表** — 柱状图、折线图、散点图、饼图、雷达图、K线图、热力图、桑基图、矩形树图、旭日图等
+- **零 DOM 形状组件** — 形状组件是纯代理（`return null`），渲染完全在引擎层进行
+- **合成事件系统** — `onClick`、`onMouseEnter`、`onDrag` 等，支持 `stopPropagation()` 阻止冒泡
+- **声明式动画** — Tween 剧本，支持分组并行/串行、循环、watch 触发
+- **视口裁剪** — Canvas 模式下自动裁剪视口外元素
+- **TypeScript 优先** — 完整类型定义
+
+## 📦 安装
+
+```bash
+npm install react-viz-composer
+```
+
+需要 `react` 和 `react-dom` 作为 peer dependencies（>=18.0.0）。
+
+## 🚀 快速开始
+
+```tsx
+import ReactVizComposer, { Rect, Text, Group } from 'react-viz-composer';
+
+function MyFirstChart() {
+  return (
+    <ReactVizComposer engine="canvas" width={600} height={400}>
+      <Rect x={50} y={50} width={100} height={200} fill="#1677ff" rx={4} />
+      <Text x={100} y={270} text="你好 Viz！" fontSize={14} fill="#333" textAlign="middle" />
+    </ReactVizComposer>
+  );
+}
+```
+
+### 使用内置图表
+
+```tsx
+import { BarChart } from 'react-viz-composer/charts';
+
+function App() {
+  return (
+    <BarChart
+      data={[
+        { month: '1月', value: 120 },
+        { month: '2月', value: 200 },
+        { month: '3月', value: 150 },
+      ]}
+      onItemEnter={(d, evt) => console.log(d.month)}
+      onItemLeave={() => {}}
+    />
+  );
+}
+```
+
+## 📚 API
+
+### `<ReactVizComposer>` 根组件
+
+| 属性 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `engine` | `'svg' \| 'canvas'` | `'svg'` | 渲染引擎 |
+| `width` | `number \| string` | `'100%'` | 画布宽度 |
+| `height` | `number \| string` | `'100%'` | 画布高度 |
+| `viewport` | `{ x, y, scale }` | — | 受控视口（平移/缩放） |
+| `interactiveViewport` | `boolean` | `false` | 启用滚轮缩放 + 拖拽平移 |
+| `onViewportChange` | `(v: Viewport) => void` | — | 视口变化回调 |
+| `autoSize` | `boolean` | `true` | ResizeObserver 自动适配 |
+| `debounceWait` | `number` | `120` | resize 防抖（ms） |
+| `cullMargin` | `ViewportCullMargin` | `20%` | 裁剪边距 |
+| `canvasEventProps` | `ShapeEventProps` | — | 画布空白区域事件 |
+
+### 形状组件
+
+| 组件 | 关键属性 |
+|------|---------|
+| `<Rect>` | `x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
+| `<Ellipse>` | `cx, cy, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
+| `<Line>` | `points: {x,y}[], stroke, strokeWidth, closed, clipPath, filter, mask` |
+| `<Path>` | `d: string, fill, stroke, clipPath, filter, mask` |
+| `<Text>` | `text, x, y, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline, filter, mask` |
+| `<Image>` | `src, x, y, width, height, clipPath, filter, mask` |
+| `<Group>` | `x, y, rotation, scaleX, scaleY, opacity, children, filter, mask` |
+| `<Animation>` | `playbook: AnimStep[], autoPlay, children` |
+| `<LinearGradient>` | `id, x1, y1, x2, y2, stops` |
+| `<RadialGradient>` | `id, cx, cy, r, stops` |
+| `<ClipPath>` | `id, shapeType, shapeData` |
+| `<Filter>` | `id, effects: FilterEffect[]` |
+| `<Mask>` | `id, shapeType, shapeData, maskMode` |
+
+### 事件
+
+所有形状支持 React 风格事件 props：
+
+`onClick`、`onDoubleClick`、`onContextMenu`、`onMouseDown`、`onMouseUp`、`onMouseMove`、`onMouseEnter`、`onMouseLeave`、`onPointerDown`、`onPointerUp`、`onPointerMove`、`onPointerEnter`、`onPointerLeave`、`onTouchStart`、`onTouchEnd`、`onTouchMove`、`onWheel`、`onDragStart`、`onDrag`、`onDragEnd`
+
+```tsx
+<Rect
+  x={10} y={10} width={100} height={50} fill="blue"
+  onClick={(evt) => console.log('点击坐标', evt.offsetX, evt.offsetY)}
+  onMouseEnter={(evt) => evt.preventDefault()}
+/>
+```
+
+### 滤镜
+
+```tsx
+<Filter id="blur-3" effects={[{ type: 'blur', value: 3 }]} />
+<Rect x={50} y={50} width={200} height={200} fill="blue" filter="url(#blur-3)" />
+```
+
+支持：`blur`、`brightness`、`contrast`、`dropShadow`、`grayscale`、`opacity`、`saturate`、`sepia`、`hueRotate`。
+
+### 遮罩
+
+```tsx
+<Mask id="circle-mask" shapeType="ellipse"
+  shapeData={{ cx: 100, cy: 100, rx: 50, ry: 50 }} />
+<Rect x={50} y={50} width={200} height={200} fill="blue" mask="url(#circle-mask)" />
+```
+
+### 动画
+
+```tsx
+<Animation
+  playbook={[
+    { attribute: 'height', from: 0, to: 200, duration: 600, easing: 'easeOut' },
+    { attribute: 'opacity', from: 0, to: 1, duration: 400, group: 1 },
+  ]}
+  autoPlay
+>
+  <Rect x={50} y={50} width={100} height={0} fill="blue" />
+</Animation>
+```
+
+## 📊 内置图表
+
+从 `react-viz-composer/charts` 导入：
+
+| 分类 | 图表 |
+|------|------|
+| **基础** | BarChart, LineChart, ScatterChart, PieChart, DoughnutChart, AreaChart, StackedAreaChart, RadarChart, FunnelChart, HistogramChart, RoseChart, PolarBarChart, GaugeChart, LiquidFillChart, SingleAxisScatterChart |
+| **统计与业务** | BoxplotChart, ErrorBarChart, WaterfallChart, CandlestickChart, HeatmapChart, CalendarHeatmapChart, GanttChart, TimelineChart, ParallelCoordinatesChart, ThemeRiverChart, PictorialBarChart, DensityCloudChart, ContourChart, HorizontalBarChart, StackedBarChart, BidirectionalBarChart |
+| **层级与关系** | TreemapChart, SunburstChart, TreeChart, SankeyChart, ChordChart, VennChart, CircularGraphChart, NetworkGraphChart, WordCloudChart |
+| **组合与特色** | ComboChart, BubbleChart, ExplorableScatterChart, CurvatureCombChart, StepLineChart, SmoothLineChart, EffectScatterChart |
+
+所有图表遵循统一的 API 模式，支持 `data`、`onItemEnter`、`onItemLeave` props 和入场动画。
+
+## 🏗️ 架构
+
+```
+React JSX（Rect、Group、Line 等）
+    │  组件将 props 序列化为 JSON → VizContext 投递
+    ▼
+SceneTree（嵌套 JSON 树，脏标记管理）
+    │  subscribe → syncFromSceneTree
+    ▼
+Model（扁平索引、worldMatrix 缓存、脏标记）
+    │  getTopLevelElements()
+    ▼
+Renderer（CanvasRenderer / SVGRenderer）
+```
+
+- **React 层** — 形状组件是纯代理（`return null`），渲染全部委托给引擎
+- **引擎层** — 纯 TypeScript，零 React 依赖，可独立测试
+- **EventSystem** — SVG/Canvas 统一命中检测 + 冒泡
+
+## 🔧 高级：引擎 API
+
+```tsx
+import { Model, Graph, SceneTree, EventSystem, CanvasRenderer, SVGRenderer } from 'react-viz-composer';
+
+// 直接访问引擎层，用于自定义集成
+const graph = new Graph({ engine: 'canvas' });
+graph.mount(containerElement);
+```
+
+## 📄 License
+
+MIT
