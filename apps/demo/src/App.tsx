@@ -222,18 +222,13 @@ function ChartCard({ entry }: { entry: ChartEntry }) {
             width: CARD_SIZE,
             height: CARD_SIZE - CARD_TITLE_HEIGHT,
             background: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             overflow: 'hidden',
             flexShrink: 0,
           }}
         >
           <ViewportRender minHeight={CARD_SIZE - CARD_TITLE_HEIGHT}>
-            <div style={{ width: CARD_SIZE, height: CARD_SIZE - CARD_TITLE_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ transform: 'scale(0.5)', transformOrigin: 'center center', lineHeight: 0 }}>
-                {entry.demo}
-              </div>
+            <div style={{ width: '100%', height: CARD_SIZE - CARD_TITLE_HEIGHT }}>
+              {entry.demo}
             </div>
           </ViewportRender>
         </div>

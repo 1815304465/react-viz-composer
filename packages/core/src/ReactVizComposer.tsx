@@ -113,12 +113,11 @@ function ReactVizComposer(props: Props) {
     }
 
     // 首次同步 SceneTree
-    graph.applyScene(sceneTree.root);
+    graph.applySceneChange(sceneTree, 'register');
 
-    // 注入 flush 调度器：将 updateNode 缓冲到同帧末尾批量处理
-    // 通过 Scheduler.enqueueJob 在渲染后的时间预算内执行
+    // 同步 flush：入场动画 update 必须在同帧 render 前写入 SceneTree
     sceneTree.setFlushScheduler(() => {
-      graph.enqueueJob(() => sceneTree.flushUpdates(), 0);
+      sceneTree.flushUpdates();
     });
 
     // 注册根事件处理器：将 canvasEventProps 转为 EventSystem 事件表并注入
@@ -129,9 +128,9 @@ function ReactVizComposer(props: Props) {
       graph.eventSystem.setRootEventHandler(rootEvents);
     }
 
-    // 订阅 SceneTree：子组件 register/update 时同步到 Model
-    const unsubScene = sceneTree.subscribe(() => {
-      graphRef.current?.applyScene(sceneTree.root);
+    // 订阅 SceneTree：结构变更全量同步，数据更新增量同步
+    const unsubScene = sceneTree.subscribe((reason) => {
+      graphRef.current?.applySceneChange(sceneTree, reason);
     });
 
     return () => {
@@ -262,13 +261,21 @@ export { Line } from './shapes/geometries/Line';
 export { Path } from './shapes/geometries/Path';
 export { Text } from './shapes/geometries/Text';
 export { Image } from './shapes/geometries/Image';
+export { Points } from './shapes/geometries/Points';
 export { LinearGradient } from './shapes/definitions/LinearGradient';
 export { RadialGradient } from './shapes/definitions/RadialGradient';
-export { ClipPath } from './shapes/definitions/ClipPath';
-export { Filter } from './shapes/definitions/Filter';
-export { Mask } from './shapes/definitions/Mask';
+export { ClipPath } from './shapes/containers/ClipPath';
+export { Filter } from './shapes/containers/Filter';
+export { Mask } from './shapes/containers/Mask';
 export { Group } from './shapes/containers/Group';
 export { Animation } from './shapes/containers/Animation';
-export type { AnimStep, AnimAttribute, AnimEasing, AnimationHandle } from './engine/types';
+export type {
+  AnimStep,
+  AnimAttribute,
+  AnimEasing,
+  AnimTarget,
+  AnimComputeContext,
+  AnimationHandle,
+} from './engine/types';
 export type { ViewportCullMargin, VizEvent, VizEventHandler, VizDragEvent, VizDragEventHandler } from './engine/types';
 export type { ShapeEventProps } from './shapes/events';

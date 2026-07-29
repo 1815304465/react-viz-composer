@@ -1,25 +1,26 @@
-import { useRegisterNode } from '../../context';
+import { useShapeElement } from '../register';
 /**
- * RadialGradient —— 径向渐变定义组件（纯代理）
- * 开发者声明渐变参数，渲染引擎负责实现 CanvasGradient 或 SVG <radialGradient>
+ * RadialGradient —— 径向渐变定义（纯代理）
+ *
+ * 经 useShapeElement 注册到 SceneTree；其他形状通过 fill="url(#id)" 引用。
  */
-function RadialGradient({ id, cx = 0.5, cy = 0.5, r = 0.5, fx, fy, gradientUnits = 'objectBoundingBox', stops, }) {
-    useRegisterNode(id, () => ({
+function RadialGradient(props) {
+    const { id, cx = 0.5, cy = 0.5, r = 0.5, fx, fy, gradientUnits = 'objectBoundingBox', stops, } = props;
+    const data = {
         id,
-        type: 'radialGradient',
-        data: {
-            id,
-            cx, cy, r, fx, fy,
-            gradientUnits,
-            stops: stops.map((s) => ({
-                offset: s.offset,
-                color: s.color,
-                opacity: s.opacity,
-            })),
-        },
-        dirty: true,
-        subtreeDirty: true,
-    }), [id, cx, cy, r, fx, fy, gradientUnits, stops]);
+        cx,
+        cy,
+        r,
+        fx,
+        fy,
+        gradientUnits,
+        stops: stops.map((s) => ({
+            offset: s.offset,
+            color: s.color,
+            opacity: s.opacity,
+        })),
+    };
+    useShapeElement('radialGradient', id, data, {});
     return null;
 }
 export default RadialGradient;

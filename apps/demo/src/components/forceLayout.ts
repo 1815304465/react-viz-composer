@@ -8,10 +8,6 @@
 export interface ForceNode {
   id: string;
   label?: string;
-  /** 布局后写入 */
-  x: number;
-  /** 布局后写入 */
-  y: number;
 }
 
 export interface ForceEdge {
@@ -39,11 +35,18 @@ export interface ForceLayoutOptions {
   iterations?: number;
 }
 
+/**
+ * 对节点做简易力导向布局，返回带像素坐标的节点副本
+ * @param nodes 输入节点（无需坐标）
+ * @param edges 边列表
+ * @param options 布局参数
+ * @returns 带 x/y 的节点数组
+ */
 export function forceLayout<T extends ForceNode>(
   nodes: T[],
   edges: ForceEdge[],
   options: ForceLayoutOptions = {},
-): T[] {
+): Array<T & { x: number; y: number }> {
   const {
     cx = 300,
     cy = 200,
@@ -121,8 +124,8 @@ export function forceLayout<T extends ForceNode>(
     const sim = simNodes.find((sn) => sn.id === n.id);
     return {
       ...n,
-      x: sim?.x ?? n.x,
-      y: sim?.y ?? n.y,
+      x: sim?.x ?? cx,
+      y: sim?.y ?? cy,
     };
   });
 }

@@ -1,10 +1,9 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/utilities" },
     { "path": "./packages/core" },
-    { "path": "./packages/components" },
-    { "path": "./packages/charts" },
+    { "path": "./packages/kit" },
+    { "path": "./apps/charts" },
     { "path": "./apps/demo" }
   ]
 }

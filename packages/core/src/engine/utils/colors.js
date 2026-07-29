@@ -74,15 +74,6 @@ function getColorMode(fill) {
     return 0;
 }
 /**
- * 从 "url(#my-clip)" 格式中提取 clip id
- * @param value clipPath 引用字符串
- * @returns clip id，解析失败返回 null
- */
-function extractClipId(value) {
-    const m = value.match(/^url\(#(.+)\)$/);
-    return m ? m[1] : null;
-}
-/**
  * 从 "url(#grad-id)" 格式中提取渐变 id
  * @param fill 填充引用字符串
  * @returns 渐变 id，解析失败返回 null
@@ -119,4 +110,4 @@ function gradientStopColor(stop) {
     }
     return stop.color;
 }
-export { parseColor, rgbaToCss, lerpColor, getColorMode, extractClipId, extractGradientId, gradientStopColor, };
+export { parseColor, rgbaToCss, lerpColor, getColorMode, extractGradientId, gradientStopColor, };

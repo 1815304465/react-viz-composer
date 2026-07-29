@@ -9,4 +9,8 @@ export * from './bounds';
 export * from './elements';
 export * from './shapes';
 export * from './pathCache';
+export * from './pathBounds';
+export * from './points';
+export * from './spatialIndex';
 export * from './animations';
+export { AnimPlayer } from './AnimPlayer';

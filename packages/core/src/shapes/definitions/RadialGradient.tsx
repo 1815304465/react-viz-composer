@@ -1,5 +1,5 @@
 import type { RadialGradientData, GradientStop } from '../../engine/types';
-import { useRegisterNode } from '../../context';
+import { useShapeElement } from '../register';
 
 interface StopProps {
   offset: number;
@@ -8,6 +8,7 @@ interface StopProps {
 }
 
 interface Props {
+  /** 渐变 id，供 fill="url(#id)" 引用 */
   id: string;
   cx?: number;
   cy?: number;
@@ -19,37 +20,38 @@ interface Props {
 }
 
 /**
- * RadialGradient —— 径向渐变定义组件（纯代理）
- * 开发者声明渐变参数，渲染引擎负责实现 CanvasGradient 或 SVG <radialGradient>
+ * RadialGradient —— 径向渐变定义（纯代理）
+ *
+ * 经 useShapeElement 注册到 SceneTree；其他形状通过 fill="url(#id)" 引用。
  */
-function RadialGradient({
-  id,
-  cx = 0.5, cy = 0.5, r = 0.5,
-  fx, fy,
-  gradientUnits = 'objectBoundingBox',
-  stops,
-}: Props) {
-  useRegisterNode(
+function RadialGradient(props: Props) {
+  const {
     id,
-    () => ({
-      id,
-      type: 'radialGradient',
-      data: {
-        id,
-        cx, cy, r, fx, fy,
-        gradientUnits,
-        stops: stops.map((s): GradientStop => ({
-          offset: s.offset,
-          color: s.color,
-          opacity: s.opacity,
-        })),
-      } as RadialGradientData,
-      dirty: true,
-      subtreeDirty: true,
-    }),
-    [id, cx, cy, r, fx, fy, gradientUnits, stops],
-  );
+    cx = 0.5,
+    cy = 0.5,
+    r = 0.5,
+    fx,
+    fy,
+    gradientUnits = 'objectBoundingBox',
+    stops,
+  } = props;
 
+  const data: RadialGradientData = {
+    id,
+    cx,
+    cy,
+    r,
+    fx,
+    fy,
+    gradientUnits,
+    stops: stops.map((s): GradientStop => ({
+      offset: s.offset,
+      color: s.color,
+      opacity: s.opacity,
+    })),
+  };
+
+  useShapeElement('radialGradient', id, data, {});
   return null;
 }
 

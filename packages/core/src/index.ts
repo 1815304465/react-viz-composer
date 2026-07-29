@@ -15,13 +15,14 @@ export { Line } from './shapes/geometries/Line';
 export { Path } from './shapes/geometries/Path';
 export { Text } from './shapes/geometries/Text';
 export { Image } from './shapes/geometries/Image';
+export { Points } from './shapes/geometries/Points';
 
 // 定义类组件
 export { LinearGradient } from './shapes/definitions/LinearGradient';
 export { RadialGradient } from './shapes/definitions/RadialGradient';
-export { ClipPath } from './shapes/definitions/ClipPath';
-export { Filter } from './shapes/definitions/Filter';
-export { Mask } from './shapes/definitions/Mask';
+export { ClipPath } from './shapes/containers/ClipPath';
+export { Filter } from './shapes/containers/Filter';
+export { Mask } from './shapes/containers/Mask';
 
 // 容器组件
 export { Group } from './shapes/containers/Group';
@@ -29,9 +30,9 @@ export { Animation } from './shapes/containers/Animation';
 
 // 通用类型
 export type {
-  AnimStep, AnimAttribute, AnimEasing, AnimationHandle,
+  AnimStep, AnimAttribute, AnimEasing, AnimTarget, AnimComputeContext, AnimationHandle,
   ViewportCullMargin, Viewport,
-  RectData, EllipseData, LineData, PathData, TextData, ImageData,
+  RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData,
   GroupData, AnimationData, ElementData, ElementType,
   Transform, Point, EngineType,
   GradientStop, LinearGradientData, RadialGradientData,
@@ -56,8 +57,5 @@ export {
   useVizFrame,
   useParentId,
   useSceneTree,
-  useRegisterNode,
-  useAnimAttrs,
-  applyAnimAttrs,
 } from './context';
 export type { IVizContext, IVizFrameContext } from './context';

@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-viz-composer/charts": "*",
+    "@react-viz-composer/core": "*",
+    "@react-viz-composer/kit": "*",
     "react-viz-composer": "*",
     "antd": "^6.5.2",
     "prism-react-renderer": "^2.4.1",

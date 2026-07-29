@@ -1,7 +1,7 @@
 import type { Model } from '../Model';
 import { VizEvent } from '../types';
 import type {
-  VizEventType, VizEventHandler, ElementRecord, RectData, EllipseData, LineData, PathData, TextData, ImageData,
+  VizEventType, VizEventHandler, ElementRecord, RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData,
   Transform, Viewport,
 } from '../types';
 import { Path2DCache } from '../utils/pathCache';
@@ -9,6 +9,8 @@ import { getGroupBounds, getElementBounds } from '../utils/bounds';
 import { isElementVisible, isPointerEventsEnabled } from '../utils/elements';
 import { sortByPaintOrder } from '../utils/paintOrder';
 import { pointToSegmentDist } from '../utils/maths';
+import { SpatialIndex } from '../utils/spatialIndex';
+import { hitTestPoints } from '../utils/points';
 
 /** 容器级绑定的 pointer 事件类型列表（不含 click/dblclick，它们由 pointer 事件自动触发） */
 const BOUND_POINTER_EVENTS: string[] = [
@@ -56,6 +58,7 @@ class EventSystem {
 
   private hitCtx: CanvasRenderingContext2D;
   private pathCache = new Path2DCache(512);
+  private spatialIndex = new SpatialIndex(64);
 
   constructor(model: Model) {
     this.model = model;
@@ -95,14 +98,20 @@ class EventSystem {
   /**
    * 同步 Canvas 渲染模式下的元素列表（用于逆序命中检测）
    * 排除 defs 类节点（渐变/裁剪/滤镜/遮罩），它们不参与命中测试
+   * @param elements 可命中元素列表
+   * @param visible 视口裁剪区域（世界坐标），null 表示不过滤
    */
-  syncCanvasElements(elements: ElementRecord[]): void {
+  syncCanvasElements(
+    elements: ElementRecord[],
+    visible: { x: number; y: number; w: number; h: number } | null = null,
+  ): void {
     const drawable = elements.filter(
       (e) => !e.removed
         && e.type !== 'linearGradient' && e.type !== 'radialGradient'
         && e.type !== 'clipPath' && e.type !== 'filter' && e.type !== 'mask',
     );
     this.canvasElements = sortByPaintOrder(drawable);
+    this.spatialIndex.rebuild(this.canvasElements, visible);
   }
 
   /** 设置当前视口状态 */
@@ -309,8 +318,9 @@ class EventSystem {
 
   /** 构建从目标元素到根的事件冒泡路径 */
   private buildBubblePath(targetId: string): string[] {
+    const elementId = this.resolveElementId(targetId);
     const path: string[] = [];
-    let current: ElementRecord | undefined = this.model.getElement(targetId);
+    let current: ElementRecord | undefined = this.model.getElement(elementId);
     while (current) {
       path.push(current.id);
       if (current.parentId) {
@@ -320,6 +330,17 @@ class EventSystem {
       }
     }
     return path;
+  }
+
+  /**
+   * 从命中 id 解析元素 id（支持 Points 的 id#index 格式）
+   * @param targetId 命中目标 id
+   */
+  private resolveElementId(targetId: string): string {
+    const hash = targetId.indexOf('#');
+    if (hash <= 0) return targetId;
+    const elementId = targetId.slice(0, hash);
+    return this.model.getElement(elementId) ? elementId : targetId;
   }
 
   /** 在指定元素上调用事件处理器，临时设置 currentTarget */
@@ -369,8 +390,9 @@ class EventSystem {
     while (current && current !== this.boundContainer) {
       if (current instanceof SVGElement) {
         const vizId = current.getAttribute('data-viz-id');
-        if (vizId && this.model.getElement(vizId)) {
-          return vizId;
+        if (vizId) {
+          const baseId = vizId.includes('#') ? vizId.split('#')[0] : vizId;
+          if (this.model.getElement(baseId)) return vizId;
         }
       }
       current = current.parentElement;
@@ -387,8 +409,16 @@ class EventSystem {
     const worldX = offsetX / scale - vx;
     const worldY = offsetY / scale - vy;
 
-    for (let i = this.canvasElements.length - 1; i >= 0; i--) {
-      const record = this.canvasElements[i];
+    const spatialHits = this.spatialIndex.query(worldX, worldY);
+    let searchList: ElementRecord[];
+    if (spatialHits.length > 0) {
+      const hitIds = new Set(spatialHits.map((r) => r.id));
+      searchList = [...this.canvasElements].reverse().filter((r) => hitIds.has(r.id));
+    } else {
+      searchList = [...this.canvasElements].reverse();
+    }
+
+    for (const record of searchList) {
       if (!isElementVisible(this.model, record)) continue;
       if (!isPointerEventsEnabled(this.model, record)) continue;
 
@@ -396,6 +426,12 @@ class EventSystem {
 
       if (record.type === 'group') {
         if (this.testGroup(record, lx, ly)) return record.id;
+        continue;
+      }
+
+      if (record.type === 'points') {
+        const idx = hitTestPoints(record.data as PointsData, lx, ly);
+        if (idx >= 0) return `${record.id}#${idx}`;
         continue;
       }
 
@@ -457,6 +493,8 @@ class EventSystem {
         return this.testText(record.data as TextData, x, y);
       case 'image':
         return this.testImage(record.data as ImageData, x, y);
+      case 'points':
+        return hitTestPoints(record.data as PointsData, x, y) >= 0;
       default:
         return false;
     }

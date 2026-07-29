@@ -1,6 +1,6 @@
 # ⚡ ReactVizComposer
 
-Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations from low-level primitives — `Rect`, `Ellipse`, `Line`, `Path`, `Text`, `Image`, `Group`, `Animation` — with 48 built-in chart types, covering the full ECharts catalog.
+Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations from low-level primitives — `Rect`, `Ellipse`, `Line`, `Path`, `Text`, `Image`, `Group`, `Animation`. The repo also ships 48 reference chart implementations under `apps/charts` (not published to npm).
 
 [![npm version](https://img.shields.io/npm/v/react-viz-composer)](https://www.npmjs.com/package/react-viz-composer)
 [![license](https://img.shields.io/npm/l/react-viz-composer)](./LICENSE)
@@ -9,7 +9,7 @@ Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations
 
 - **Declarative Data-Driven** — Write JSX shapes, the engine handles rendering
 - **Hybrid SVG/Canvas** — Choose `engine="svg"` for incremental DOM or `engine="canvas"` for full redraw + viewport culling
-- **48 Built-in Charts** — Bar, Line, Scatter, Pie, Radar, Candlestick, Heatmap, Sankey, Treemap, Sunburst, and more
+- **Chart Building Kit** — `ChartFrame`, `Axis`, scales, palette via `@react-viz-composer/kit` (also re-exported from `react-viz-composer`)
 - **Zero-DOM Shapes** — Shape components are pure proxies that `return null`; all rendering happens in the engine layer
 - **Synthetic Event System** — `onClick`, `onMouseEnter`, `onDrag`, etc. with `stopPropagation()` support
 - **Animation System** — Declarative tween playbooks with grouping, looping, and watch triggers
@@ -20,6 +20,8 @@ Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations
 
 ```bash
 npm install react-viz-composer
+# or install packages separately:
+# npm install @react-viz-composer/core @react-viz-composer/kit
 ```
 
 Requires `react` and `react-dom` as peer dependencies (>=18.0.0).
@@ -39,26 +41,46 @@ function MyFirstChart() {
 }
 ```
 
-### Using Built-in Charts
+### Building a Chart with the Kit
 
 ```tsx
-import { BarChart } from 'react-viz-composer/charts';
+import { Animation, Rect } from 'react-viz-composer';
+import {
+  ChartFrame, PLOT_WIDTH, PLOT_HEIGHT,
+  scaleBand, scaleLinear, Axis, Grid, SEMANTIC_6,
+} from 'react-viz-composer';
+// or: from '@react-viz-composer/kit'
 
-function App() {
+function SimpleBarChart({ data }) {
+  const categories = data.map((d) => d.month);
+  const xScale = scaleBand(categories, [0, PLOT_WIDTH], 0.3);
+  const yScale = scaleLinear([0, 300], [PLOT_HEIGHT, 0]);
+
   return (
-    <BarChart
-      data={[
-        { month: 'Jan', value: 120 },
-        { month: 'Feb', value: 200 },
-        { month: 'Mar', value: 150 },
-      ]}
-      onItemEnter={(d, evt) => console.log(d.month)}
-      onItemLeave={() => {}}
-    />
+    <ChartFrame>
+      <Grid scale={yScale} orient="y" />
+      <Animation playbook={[
+        { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children' },
+      ]}>
+        {data.map((d) => (
+          <Rect
+            key={d.month}
+            x={xScale(d.month)}
+            y={yScale(d.value)}
+            width={xScale.bandwidth}
+            height={PLOT_HEIGHT - yScale(d.value)}
+            fill={SEMANTIC_6[0]}
+          />
+        ))}
+      </Animation>
+      <Axis scale={xScale} orient="bottom" />
+      <Axis scale={yScale} orient="left" />
+    </ChartFrame>
   );
 }
 ```
 
+Reference chart implementations (Bar, Line, Pie, Sankey, …) live in the monorepo at `apps/charts` and power the demo app — they are **not** part of the published npm package.
 ## 📚 API
 
 ### `<ReactVizComposer>` Root Component
@@ -80,19 +102,20 @@ function App() {
 
 | Component | Key Props |
 |-----------|-----------|
-| `<Rect>` | `x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
-| `<Ellipse>` | `cx, cy, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
-| `<Line>` | `points: {x,y}[], stroke, strokeWidth, closed, clipPath, filter, mask` |
-| `<Path>` | `d: string, fill, stroke, clipPath, filter, mask` |
-| `<Text>` | `text, x, y, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline, filter, mask` |
-| `<Image>` | `src, x, y, width, height, clipPath, filter, mask` |
-| `<Group>` | `x, y, rotation, scaleX, scaleY, opacity, children, filter, mask` |
+| `<Rect>` | `x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity` |
+| `<Ellipse>` | `cx, cy, rx, ry, fill, stroke, strokeWidth, opacity` |
+| `<Line>` | `points: {x,y}[], stroke, strokeWidth, closed` |
+| `<Path>` | `d: string, fill, stroke` |
+| `<Text>` | `text, x, y, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline` |
+| `<Image>` | `src, x, y, width, height` |
+| `<Points>` | `cx: number[], cy: number[], rx?, ry?, fill?, stroke?` |
+| `<Group>` | `x, y, rotation, scaleX, scaleY, opacity, children` |
 | `<Animation>` | `playbook: AnimStep[], autoPlay, children` |
-| `<LinearGradient>` | `id, x1, y1, x2, y2, stops` |
-| `<RadialGradient>` | `id, cx, cy, r, stops` |
-| `<ClipPath>` | `id, shapeType, shapeData` |
-| `<Filter>` | `id, effects: FilterEffect[]` |
-| `<Mask>` | `id, shapeType, shapeData, maskMode` |
+| `<LinearGradient>` | `id` (required for `fill="url(#id)"`), `x1, y1, x2, y2, stops` |
+| `<RadialGradient>` | `id` (required for `fill="url(#id)"`), `cx, cy, r, stops` |
+| `<ClipPath>` | `clip: ReactElement, children` |
+| `<Filter>` | `effects: FilterEffect[], children` |
+| `<Mask>` | `mask: ReactElement, maskMode?, children` |
 
 ### Events
 
@@ -108,49 +131,49 @@ All shapes support React-style event props:
 />
 ```
 
-### Filter Effects
+### ClipPath / Filter / Mask (containers)
+
+Clip, filter, and mask apply to their **children** — no `url(#id)` props on geometries.
 
 ```tsx
-<Filter id="blur-3" effects={[{ type: 'blur', value: 3 }]} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" filter="url(#blur-3)" />
+<ClipPath clip={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+  <Path d="..." />
+</ClipPath>
+
+<Filter effects={[{ type: 'blur', value: 3 }]}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Filter>
+
+<Mask mask={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Mask>
 ```
 
-Supported: `blur`, `brightness`, `contrast`, `dropShadow`, `grayscale`, `opacity`, `saturate`, `sepia`, `hueRotate`.
-
-### Mask
-
-```tsx
-<Mask id="circle-mask" shapeType="ellipse"
-  shapeData={{ cx: 100, cy: 100, rx: 50, ry: 50 }} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" mask="url(#circle-mask)" />
-```
+Filter effects: `blur`, `brightness`, `contrast`, `dropShadow`, `grayscale`, `opacity`, `saturate`, `sepia`, `hueRotate`.
 
 ### Animation
+
+Children use **final visual props**; `from` is the entry start. `targets: 'children'` pierces ClipPath / Filter / Mask; named `id` targets also work.
 
 ```tsx
 <Animation
   playbook={[
-    { attribute: 'height', from: 0, to: 200, duration: 600, easing: 'easeOut' },
-    { attribute: 'opacity', from: 0, to: 1, duration: 400, group: 1 },
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOut', targets: 'children' },
+    { attribute: 'opacity', from: 0, duration: 400, group: 1, targets: 'children' },
   ]}
   autoPlay
 >
-  <Rect x={50} y={50} width={100} height={0} fill="blue" />
+  <Rect x={50} y={50} width={100} height={200} fill="blue" />
 </Animation>
 ```
 
-## 📊 Built-in Charts
+## 📦 Packages
 
-Import from `react-viz-composer/charts`:
-
-| Category | Charts |
-|----------|--------|
-| **Basic** | BarChart, LineChart, ScatterChart, PieChart, DoughnutChart, AreaChart, StackedAreaChart, RadarChart, FunnelChart, HistogramChart, RoseChart, PolarBarChart, GaugeChart, LiquidFillChart, SingleAxisScatterChart |
-| **Statistical** | BoxplotChart, ErrorBarChart, WaterfallChart, CandlestickChart, HeatmapChart, CalendarHeatmapChart, GanttChart, TimelineChart, ParallelCoordinatesChart, ThemeRiverChart, PictorialBarChart, DensityCloudChart, ContourChart, HorizontalBarChart, StackedBarChart, BidirectionalBarChart |
-| **Hierarchy** | TreemapChart, SunburstChart, TreeChart, SankeyChart, ChordChart, VennChart, CircularGraphChart, NetworkGraphChart, WordCloudChart |
-| **Composite** | ComboChart, BubbleChart, ExplorableScatterChart, CurvatureCombChart, StepLineChart, SmoothLineChart, EffectScatterChart |
-
-All charts follow a unified API pattern with `data`, `onItemEnter`, `onItemLeave` props and support entry animations.
+| Package | Role |
+|---------|------|
+| `react-viz-composer` / `@react-viz-composer/core` | Engine + shape primitives |
+| `@react-viz-composer/kit` | Chart building blocks (Frame, Axis, scales, palette) |
+| `apps/charts` (repo only) | 48 reference chart implementations for demos |
 
 ## 🏗️ Architecture
 

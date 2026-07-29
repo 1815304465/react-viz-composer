@@ -1,7 +1,5 @@
 import { useId, useEffect, useRef, useCallback } from 'react';
-import {
-  useViz, useVizFrame, useParentId, useAnimAttrs, applyAnimAttrs,
-} from '../context';
+import { useViz, useVizFrame, useParentId } from '../context';
 import type { ElementData, ElementType, Transform, VizEvent } from '../engine/types';
 import {
   buildShapeEvents,
@@ -26,7 +24,7 @@ const STROKE_EXTRA_KEYS = [
 
 /** 填充/描边基础键 */
 const STROKE_STYLE_KEYS = [
-  'fill', 'stroke', 'strokeWidth', 'clipPath', 'filter', 'mask',
+  'fill', 'stroke', 'strokeWidth',
 ] as const;
 
 const RECT_DATA_KEYS = [
@@ -41,8 +39,8 @@ const ELLIPSE_DATA_KEYS = [
 
 const LINE_DATA_KEYS = [
   'points', 'closed', 'fill',
-  'stroke', 'strokeWidth', 'clipPath', 'filter', 'mask',
-  ...SHAPE_COMMON_KEYS, 'strokeDasharray',
+  'stroke', 'strokeWidth',
+  ...SHAPE_COMMON_KEYS, ...STROKE_EXTRA_KEYS,
 ] as const;
 
 const PATH_DATA_KEYS = [
@@ -53,15 +51,20 @@ const PATH_DATA_KEYS = [
 const TEXT_DATA_KEYS = [
   'text', 'x', 'y', 'fontSize', 'lineHeight', 'fontFamily', 'fontWeight',
   'textAlign', 'textBaseline',
-  ...STROKE_STYLE_KEYS, ...SHAPE_COMMON_KEYS,
+  ...STROKE_STYLE_KEYS, ...SHAPE_COMMON_KEYS, ...STROKE_EXTRA_KEYS,
 ] as const;
 
 const IMAGE_DATA_KEYS = [
-  'src', 'x', 'y', 'width', 'height', 'preserveAspectRatio', 'clipPath', 'filter', 'mask',
+  'src', 'x', 'y', 'width', 'height', 'preserveAspectRatio',
   ...SHAPE_COMMON_KEYS,
 ] as const;
 
-const GROUP_DATA_KEYS = [...SHAPE_COMMON_KEYS, 'clipPath', 'filter', 'mask'] as const;
+const POINTS_DATA_KEYS = [
+  'cx', 'cy', 'rx', 'ry', 'fill', 'stroke', 'strokeWidth',
+  ...SHAPE_COMMON_KEYS, ...STROKE_EXTRA_KEYS,
+] as const;
+
+const GROUP_DATA_KEYS = [...SHAPE_COMMON_KEYS] as const;
 
 const GROUP_TRANSFORM_KEYS = [
   'x', 'y', 'rotation', 'scaleX', 'scaleY',
@@ -71,12 +74,30 @@ const GROUP_TRANSFORM_DEFAULTS = {
   x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
 };
 
+/** 空事件 props（定义类 / Animation 容器无交互时使用） */
+const EMPTY_EVENT_PROPS: ShapeEventProps = {};
+
 /* ========== Shape props 工具 ========== */
 
 /** 将 data 字段序列化为 effect 依赖（避免 points 等数组每帧新引用导致多余 upsert） */
 function serializeDataDep(key: string, value: unknown): unknown {
   if (key === 'points' && Array.isArray(value)) {
     return value.map((p) => `${(p as { x: number; y: number }).x},${(p as { x: number; y: number }).y}`).join('|');
+  }
+  if ((key === 'cx' || key === 'cy') && Array.isArray(value)) {
+    return value.join(',');
+  }
+  if (Array.isArray(value) && (key === 'rx' || key === 'ry' || key === 'fill' || key === 'stroke' || key === 'strokeWidth')) {
+    return value.join(',');
+  }
+  if (key === 'effects' && Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  if (key === 'stops' && Array.isArray(value)) {
+    return JSON.stringify(value);
+  }
+  if ((key === 'shapeData' || key === 'transform') && value && typeof value === 'object') {
+    return JSON.stringify(value);
   }
   return value;
 }
@@ -91,54 +112,52 @@ function resolveShapeProps<K extends string, T extends object>(
 ): { id: string | undefined; data: Record<K, unknown>; eventProps: ShapeEventProps } {
   const record = props as Record<string, unknown>;
   const id = record.id as string | undefined;
-  const data = { ...defaults, ...pick(record, dataKeys) } as Record<K, unknown>;
+  const data = Object.fromEntries(
+    dataKeys.map((key) => [key, record[key] ?? defaults?.[key] ?? undefined]),
+  ) as Record<K, unknown>;
   const eventProps = pick(record, VIZ_SHAPE_EVENT_PROP_NAMES) as ShapeEventProps;
   return { id, data, eventProps };
 }
 
-/** 生成 useEffect 依赖：数据值 + 全部事件 handler */
-function shapeEffectDeps(data: Record<string, unknown>, eventProps: ShapeEventProps): unknown[] {
-  return [
-    ...Object.entries(data).map(([key, value]) => serializeDataDep(key, value)),
-    ...VIZ_SHAPE_EVENT_PROP_NAMES.map((key) => eventProps[key as keyof ShapeEventProps]),
-  ];
+/** 将 data + events 序列化为稳定的 effect 依赖键（长度固定，避免 spread 变长数组） */
+function shapeEffectDepKey(data: Record<string, unknown>, eventProps: ShapeEventProps): string {
+  const dataPart = Object.entries(data)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}\x1f${JSON.stringify(serializeDataDep(key, value))}`)
+    .join('\x1e');
+  const eventPart = VIZ_SHAPE_EVENT_PROP_NAMES
+    .map((key) => String(eventProps[key as keyof ShapeEventProps] ?? ''))
+    .join('\x1f');
+  return `${dataPart}\x1d${eventPart}`;
 }
 
 /* ========== useShapeElement hook ========== */
 
 /**
- * useShapeElement —— 子组件注册到 SceneTree 的统一 hook
+ * useShapeElement —— 所有形状 / 容器 / 定义节点注册到 SceneTree 的统一 hook
  *
  * 数据流：
  *  1. mount：构造 SceneNode → register(parentId, node)
  *  2. props 变化：update(id, { data, events })
  *  3. unmount：unregister(id)
  *
- * 变换合并移交给渲染器：
- *  - 自身 transform 写在 data.transform
- *  - 父级变换在渲染时通过 worldMatrix 矩阵乘法合成
- *
- * Animation 仍然通过 useAnimAttrs 注入瞬时形状属性（width/opacity 等）
- * —— 它会被合并进 data 后通过 update 推到 SceneTree
+ * @param type 元素类型
+ * @param propId 外部指定 id；省略则自动生成
+ * @param data 节点 data
+ * @param eventProps 事件 props；定义类可传空对象
  */
 function useShapeElement<TData extends ElementData>(
   type: ElementType,
   propId: string | undefined,
   data: TData,
-  eventProps: ShapeEventProps,
+  eventProps: ShapeEventProps = EMPTY_EVENT_PROPS,
 ): string {
   const { register, unregister, update } = useViz();
   const { registerDrag } = useVizFrame();
   const parentId = useParentId();
-  const animAttrs = useAnimAttrs();
   const autoId = useId();
   const id = propId ?? autoId;
   const isFirstUpdateRef = useRef(true);
-
-  const buildData = useCallback((): TData => {
-    if (!animAttrs) return data;
-    return applyAnimAttrs(data, animAttrs) as TData;
-  }, [data, animAttrs]);
 
   const handleMouseDown = useCallback((evt: VizEvent) => {
     eventProps.onMouseDown?.(evt);
@@ -152,23 +171,21 @@ function useShapeElement<TData extends ElementData>(
 
   // 注册 + 卸载
   useEffect(() => {
-    const finalData = buildData();
     const events = buildShapeEvents(eventProps, handleMouseDown);
-    register(parentId, { id, type, data: finalData, events, dirty: true, subtreeDirty: true });
+    register(parentId, { id, type, data, events, dirty: true, subtreeDirty: true });
     isFirstUpdateRef.current = true;
     return () => unregister(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, type, parentId]);
 
   // props 变化时增量更新
-  const effectDeps = shapeEffectDeps(data as Record<string, unknown>, eventProps);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dataDepKey = shapeEffectDepKey(data as Record<string, unknown>, eventProps);
+
   useEffect(() => {
     if (isFirstUpdateRef.current) { isFirstUpdateRef.current = false; return; }
-    const finalData = buildData();
     const events = buildShapeEvents(eventProps, handleMouseDown);
-    update(id, { data: finalData, events });
-  }, [id, update, handleMouseDown, buildData, ...effectDeps]);
+    update(id, { data, events });
+  }, [id, update, handleMouseDown, data, dataDepKey, eventProps]);
 
   return id;
 }
@@ -180,11 +197,13 @@ export {
   PATH_DATA_KEYS,
   TEXT_DATA_KEYS,
   IMAGE_DATA_KEYS,
+  POINTS_DATA_KEYS,
   GROUP_DATA_KEYS,
   GROUP_TRANSFORM_KEYS,
   GROUP_TRANSFORM_DEFAULTS,
+  EMPTY_EVENT_PROPS,
   resolveShapeProps,
-  shapeEffectDeps,
+  shapeEffectDepKey,
   useShapeElement,
 };
 export type { Transform };

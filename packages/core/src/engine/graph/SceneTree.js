@@ -221,6 +221,16 @@ class SceneTree {
     getAllNodeIds() {
         return Array.from(this.index.keys());
     }
+    /**
+     * 获取节点的直接子节点 id 列表（不含更深后代）
+     * @param parentId 父节点 id；不存在时返回空数组
+     */
+    getChildIds(parentId) {
+        const node = this.index.get(parentId);
+        if (!node?.children?.length)
+            return [];
+        return node.children.map((child) => child.id);
+    }
     // ========== 脏节点收集（渲染前调用） ==========
     /**
      * 取出并清空当前所有脏节点 id
@@ -244,12 +254,31 @@ class SceneTree {
             if (!node)
                 continue;
             const parent = this.nodeParents.get(id);
-            // 如果父级也是脏的，跳过（子节点会被父级递归覆盖）
             if (parent && dirty.has(parent.id))
                 continue;
             roots.push(id);
         }
+        for (const id of dirty) {
+            const node = this.index.get(id);
+            if (node) {
+                node.dirty = false;
+                node.subtreeDirty = false;
+            }
+        }
+        this.dirtyNodeIds.clear();
         return roots;
+    }
+    /** 全量同步后清空脏标记（register / unregister 场景） */
+    clearDirtyAfterSync() {
+        for (const id of this.dirtyNodeIds) {
+            const node = this.index.get(id);
+            if (node) {
+                node.dirty = false;
+                node.subtreeDirty = false;
+            }
+        }
+        this.dirtyNodeIds.clear();
+        this.subtreeDirtyIds.clear();
     }
     // ========== 订阅 ==========
     /**

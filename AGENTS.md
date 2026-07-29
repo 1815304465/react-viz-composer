@@ -2,9 +2,19 @@
 
 声明式 SVG/Canvas 混合渲染引擎。将图表拆解为 Rect、Ellipse、Line、Path、Text、Image、Group、Animation 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。
 
-目前基于此底层组件实现了 **48 种二维图表**，覆盖 ECharts 全部常见品类。
+目前基于此底层组件在仓库 `apps/charts` 中提供了 **48 种二维图表参考实现**（不随 npm 发布），覆盖 ECharts 全部常见品类。
 
-## 架构
+## 包结构
+
+```
+packages/core                 → 引擎 + 形状（主产品）
+packages/kit                  → 半成品工具组件（Axis / Grid / Tooltip），样式全部 props 可控
+packages/react-viz-composer   → umbrella：re-export core + kit
+apps/charts                   → 48 图参考实现 + ChartFrame / scales / palette（private）
+apps/demo                     → 演示壳
+```
+
+依赖关系：`demo → charts → kit → core`；`ChartFrame`、色板、scale 仅在 `apps/charts`，不进入 kit 发布面。
 
 ```
 用户 JSX（Rect / Group / Line / ...）
@@ -82,14 +92,14 @@ ReactVizComposer/
 │   ├── index.ts                 # 统一导出
 │   ├── events.ts                # 事件 props 定义与映射
 │   ├── register.ts              # 注册 hook + shapePropKeys + shapeProps
-│   ├── geometries/              # 几何形状（6 个）
+│   ├── geometries/              # 几何形状（7 个）
 │   │   ├── Rect.tsx / Ellipse.tsx / Line.tsx
-│   │   ├── Path.tsx / Text.tsx / Image.tsx
-│   ├── containers/              # 容器组件（2 个）
+│   │   ├── Path.tsx / Text.tsx / Image.tsx / Points.tsx
+│   ├── containers/              # 容器组件（5 个）
 │   │   ├── Group.tsx / Animation.tsx
-│   └── definitions/             # 定义类组件（5 个）
-│       ├── LinearGradient.tsx / RadialGradient.tsx
-│       ├── ClipPath.tsx / Filter.tsx / Mask.tsx
+│   │   ├── ClipPath.tsx / Filter.tsx / Mask.tsx
+│   └── definitions/             # 定义类组件（2 个）
+│       └── LinearGradient.tsx / RadialGradient.tsx
 │
 └── engine/                      # 引擎层（纯 TS，零 React 依赖）
     ├── index.ts                 # 统一导出
@@ -177,21 +187,24 @@ function Rect(props: RectData & ShapeEventProps & { id?: string }) {
 
 ### 可用形状
 
-| 组件 | 关键属性 | 新增属性 |
-|------|---------|---------|
-| `<Rect>` | x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity, clipPath | filter, mask |
-| `<Ellipse>` | cx, cy, rx, ry, fill, stroke, ... | filter, mask |
-| `<Line>` | points: { x, y }[], stroke, strokeWidth, closed | filter, mask |
-| `<Path>` | d: string (SVG path 命令), fill, stroke | filter, mask |
-| `<Text>` | x, y, text, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline | filter, mask |
-| `<Image>` | x, y, width, height, src | filter, mask |
-| `<Group>` | x, y, rotation, scaleX, scaleY, opacity, children | filter, mask |
-| `<Animation>` | playbook: AnimStep[], watch?: WatchConfig, autoPlay, children | - |
-| `<LinearGradient>` | id, x1, y1, x2, y2, stops | - |
-| `<RadialGradient>` | id, cx, cy, r, stops | - |
-| `<ClipPath>` | id, shapeType, shapeData | - |
-| `<Filter>` | id, effects: FilterEffect[] | **新增** |
-| `<Mask>` | id, shapeType, shapeData, maskMode? | **新增** |
+| 组件 | 关键属性 |
+|------|---------|
+| `<Rect>` | x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity |
+| `<Ellipse>` | cx, cy, rx, ry, fill, stroke, ... |
+| `<Line>` | points: { x, y }[], stroke, strokeWidth, closed |
+| `<Path>` | d: string (SVG path 命令), fill, stroke |
+| `<Text>` | x, y, text, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline |
+| `<Image>` | x, y, width, height, src |
+| `<Points>` | cx: number[], cy: number[], rx?, ry?, fill?, stroke?（批量圆点） |
+| `<Group>` | x, y, rotation, scaleX, scaleY, opacity, children |
+| `<Animation>` | playbook: AnimStep[], watch?: WatchConfig, autoPlay, children |
+| `<LinearGradient>` | **id**（用户指定，供 `fill="url(#id)"` 引用）, x1, y1, x2, y2, stops |
+| `<RadialGradient>` | **id**（用户指定，供 `fill="url(#id)"` 引用）, cx, cy, r, stops |
+| `<ClipPath>` | clip: ReactElement, children（声明式裁剪容器） |
+| `<Filter>` | effects: FilterEffect[], children（声明式滤镜容器） |
+| `<Mask>` | mask: ReactElement, maskMode?, children（声明式遮罩容器） |
+
+> 裁剪 / 滤镜 / 遮罩不再通过几何形状上的 `clipPath` / `filter` / `mask` 字符串 props 引用；改为用容器包裹子节点。渐变仍需用户提供 `id`，通过 `fill="url(#id)"` 引用。
 
 ### 事件
 
@@ -201,39 +214,63 @@ function Rect(props: RectData & ShapeEventProps & { id?: string }) {
 
 事件通过 EventSystem 统一处理，非 React 合成事件。支持 `evt.stopPropagation()` 阻止冒泡，`evt.preventDefault()` 阻止默认行为。
 
-### Filter（滤镜）
+### ClipPath（裁剪容器）
 
-定义滤镜效果，对标 Canvas 2D `ctx.filter`（CSS filter 字符串）。支持 `blur` / `brightness` / `contrast` / `dropShadow` / `grayscale` / `opacity` / `saturate` / `sepia` / `hueRotate`。
+声明式硬裁剪容器：`clip` 传入几何形状，作用范围为其全部 `children`，无需手动指定 id / `url(#id)`。
 
 ```tsx
-<Filter id="my-blur" effects={[{ type: 'blur', value: 3 }]} />
-<Filter id="combo" effects={[
-  { type: 'dropShadow', value: 4, offsetX: 2, offsetY: 2, color: 'rgba(0,0,0,0.3)' },
-  { type: 'grayscale', value: 50 },
-]} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" filter="url(#my-blur)" />
+<ClipPath clip={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+  <Path d="..." />
+</ClipPath>
 ```
 
-### Mask（遮罩）
+### Filter（滤镜容器）
 
-软遮罩（通过透明度/亮度控制可见程度），区别于 ClipPath 的硬裁剪。支持 `alpha` 和 `luminance` 两种模式。
+声明式滤镜容器，对标 Canvas 2D `ctx.filter`（CSS filter 字符串）。支持 `blur` / `brightness` / `contrast` / `dropShadow` / `grayscale` / `opacity` / `saturate` / `sepia` / `hueRotate`。作用范围为其全部 `children`。
 
 ```tsx
-<Mask id="circle-mask" shapeType="ellipse"
-  shapeData={{ cx: 100, cy: 100, rx: 50, ry: 50 }} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" mask="url(#circle-mask)" />
+<Filter effects={[{ type: 'blur', value: 3 }]}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Filter>
+<Filter effects={[
+  { type: 'dropShadow', value: 4, offsetX: 2, offsetY: 2, color: 'rgba(0,0,0,0.3)' },
+  { type: 'grayscale', value: 50 },
+]}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Filter>
+```
+
+### Mask（遮罩容器）
+
+声明式软遮罩容器（通过透明度/亮度控制可见程度），区别于 ClipPath 的硬裁剪。支持 `alpha` 和 `luminance` 两种模式。`mask` 传入几何形状，作用范围为其全部 `children`。
+
+```tsx
+<Mask mask={<Ellipse cx={100} cy={100} rx={50} ry={50} />} maskMode="alpha">
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Mask>
 ```
 
 ### Animation（动画容器）
 
 声明式 Tween 动画容器。通过 `playbook` 剧本定义动画步骤，支持分组并行/串行、循环、watch 监听触发、命令式 API（play/pause/resume/cancel）。
 
+子节点应写**最终视觉 props**（`to` 可省略，默认取自当前 props）；`from` 表示入场起点。
+
+`targets: 'children'` 会**穿透** ClipPath / Filter / Mask，作用到真实子形状；也可用命名 `id` 作为 target（与效果容器混用时推荐）。
+
 ```tsx
 <Animation playbook={[
-  { attribute: 'height', from: 0, to: 200, duration: 600, easing: 'easeOut' },
+  { attribute: 'height', from: 0, duration: 600, easing: 'easeOut', targets: 'children' },
   { attribute: 'scaleX', from: 1, to: 1.5, duration: 400, group: 1 },
 ]} onComplete={() => console.log('done')}>
-  <Rect x={50} y={50} width={100} height={0} fill="blue" />
+  <Rect x={50} y={50} width={100} height={200} fill="blue" />
+</Animation>
+
+{/* children 穿透 ClipPath */}
+<Animation playbook={[{ attribute: 'opacity', from: 0, targets: 'children' }]}>
+  <ClipPath clip={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+    <Path d="..." />
+  </ClipPath>
 </Animation>
 ```
 
@@ -241,19 +278,19 @@ function Rect(props: RectData & ShapeEventProps & { id?: string }) {
 
 ## 图表开发模式
 
-所有图表遵循统一模式，以 BarChart 为例：
+所有图表遵循统一模式，以 HorizontalBarChart 为例：形状写**最终视觉 props**，入场动画用 `<Animation playbook>`，`ChartFrame` 直接接收 children（不再使用 progress render prop / `useEntryProgress`）。
 
 ```tsx
-import { Rect, Text } from '../components/ReactVizComposer';
-import { ChartFrame, PLOT_WIDTH, PLOT_HEIGHT } from './shared/ChartFrame';
-import { animSize } from './shared/useEntryProgress.ts';
-import { useChartItemHover, hoverStrokeWidth, type ChartItemHoverProps } from './shared/chartEvents';
-import { scaleBand, scaleLinear } from './shared/scales';
-import { Axis, Grid } from './shared/Axis';
-import { SEMANTIC_6 } from './shared/palette';
+import { Animation, Rect, Text } from '@react-viz-composer/core';
+import { Axis, Grid } from '@react-viz-composer/kit';
+import {
+  ChartFrame, useChartSize,
+  useChartItemHover, hoverStrokeWidth, type ChartItemHoverProps,
+  scaleBand, scaleLinear, SEMANTIC_6,
+} from './local';
 
 interface BarItem {
-  month: string;
+  name: string;
   value: number;
 }
 
@@ -262,46 +299,41 @@ interface Props extends ChartItemHoverProps<BarItem> {
   color?: string;
 }
 
-export function BarChart(props: Props) {
+const BAR_PLAYBOOK = [
+  { attribute: 'width', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+] as const;
+
+export function HorizontalBarChart(props: Props) {
   const { data, color = SEMANTIC_6[0], onItemEnter, onItemLeave } = props;
   const { bindHover, isHovering } = useChartItemHover(
     { onItemEnter, onItemLeave },
-    (d: BarItem) => d.month,
+    (d: BarItem) => d.name,
   );
 
   const dataset = data ?? [/* 默认数据 */];
-  const categories = dataset.map((d) => d.month);
-
-  const xScale = scaleBand(categories, [0, PLOT_WIDTH], 0.3);
-  const yScale = scaleLinear([0, maxValue * 1.1], [PLOT_HEIGHT, 0]);
+  const categories = dataset.map((d) => d.name);
+  const yScale = scaleBand(categories, [0, PLOT_HEIGHT], 0.3);
+  const xScale = scaleLinear([0, maxValue * 1.1], [0, PLOT_WIDTH]);
 
   return (
     <ChartFrame>
-      {(progress) => (
-        <>
-          <Grid scale={yScale} orient="y" />
-
-          {dataset.map((d) => {
-            const h = animSize(fullHeight, progress);
-            const hovered = isHovering(d.month);
-            return (
-              <Rect
-                key={d.month}
-                x={xScale(d.month)}
-                y={PLOT_HEIGHT - h}
-                width={xScale.bandwidth}
-                height={h}
-                fill={color}
-                strokeWidth={hoverStrokeWidth(1, hovered)}
-                {...bindHover(d)}
-              />
-            );
-          })}
-
-          <Axis scale={xScale} orient="bottom" />
-          <Axis scale={yScale} orient="left" />
-        </>
-      )}
+      <Grid scale={xScale} orient="x" />
+      <Animation playbook={[...BAR_PLAYBOOK]}>
+        {dataset.map((d) => (
+          <Rect
+            key={d.name}
+            x={0}
+            y={yScale(d.name)}
+            width={xScale(d.value)}
+            height={yScale.bandwidth}
+            fill={color}
+            strokeWidth={hoverStrokeWidth(1, isHovering(d.name))}
+            {...bindHover(d)}
+          />
+        ))}
+      </Animation>
+      <Axis scale={xScale} orient="bottom" />
+      <Axis scale={yScale} orient="left" />
     </ChartFrame>
   );
 }
@@ -309,16 +341,16 @@ export function BarChart(props: Props) {
 
 ### 关键约定
 
-1. **ChartFrame 包裹**：所有图表必须包裹在 `<ChartFrame>` 中，使用 `{progress => ...}` render prop
-2. **入场动画**：使用 `animValue(value, progress)` / `animSize(value, progress)` 实现 0→目标值的过渡
+1. **ChartFrame 包裹**：所有图表必须包裹在 `<ChartFrame>` 中，直接传入 children（非 render prop）
+2. **入场动画**：用 `<Animation playbook>`；子节点写最终视觉 props，`from` 表示入场起点；`targets: 'children'` 可穿透 ClipPath / Filter / Mask，也可用命名 id
 3. **Hover 支持**：extends `ChartItemHoverProps<T>`，使用 `useChartItemHover` + `bindHover` + `isHovering`
 4. **默认数据**：所有 data prop 可选，缺失时使用内置默认数据确保可独立渲染
 5. **Named + Default 导出**：`export function ChartName` + `export default ChartName`
-6. **mockData 集中管理**：所有 mock 数据定义在 `src/charts/shared/mockData.ts`
+6. **mockData 集中管理**：所有 mock 数据定义在 `apps/charts/src/mockData.ts`
 
 ## Demo 模式
 
-每个图表在 `src/components/ChartDemos.tsx` 中有一个 Demo 函数，包裹 `ChartHoverShell` 提供 Tooltip：
+每个图表在 `apps/demo/src/components/ChartDemos.tsx` 中有一个 Demo 函数，包裹 `ChartHoverShell` 提供 Tooltip：
 
 ```tsx
 export function BarChartDemo() {
@@ -340,86 +372,76 @@ export function BarChartDemo() {
 
 | 路径 | 说明 |
 |------|------|
-| `charts/shared/ChartFrame.tsx` | 图表外框（600×400 Canvas），内置 EntryProgressProvider |
-| `charts/shared/useEntryProgress.ts` | 入场动画 hook（0→1 progress，easeOutCubic 缓动） |
-| `charts/shared/scales.ts` | scaleLinear / scaleBand（无 d3 依赖） |
-| `charts/shared/Axis.tsx` | 坐标轴组件（bottom/left/top/right 四方向） |
-| `charts/shared/chartEvents.ts` | useChartItemHover hook + hoverStrokeWidth/hoverOpacity 工具 |
-| `charts/shared/palette.ts` | 12 色分类色板 + 6 色语义色板 + K线涨跌色 |
-| `components/ChartDemos.tsx` | 所有图表的 Demo 函数，包裹 ChartHoverShell 提供 Tooltip |
-| `components/ChartHoverShell.tsx` | App 层 Tooltip 浮层 |
+| `packages/kit/src/Axis.tsx` | 半成品坐标轴（length/crossAt/颜色/字号均 props） |
+| `packages/kit/src/Grid.tsx` | 半成品网格线（length/stroke 均 props） |
+| `packages/kit/src/Tooltip.tsx` | 半成品浮层（位置/样式均 props） |
+| `packages/kit/src/Legend.tsx` | 半成品图例（items + onItem* 事件，自行对接系列显隐） |
+| `packages/kit/src/MarkLine.tsx` / `MarkPoint.tsx` / `MarkArea.tsx` | 阈值线 / 标注点 / 区间阴影 |
+| `packages/kit/src/Crosshair.tsx` | 十字准星（受控 x/y，配合 onMouseMove） |
+| `packages/kit/src/Brush.tsx` | 框选矩形（受控几何，配合拖拽事件） |
+| `apps/charts/src/shared/ChartFrame.tsx` | 示例外框（跟随父级宽高） |
+| `apps/charts/src/local.ts` | 示例本地 barrel（scales/palette/hover） |
+| `apps/charts/src/mockData.ts` | 图表 mock 数据 |
+| `apps/demo/src/components/ChartDemos.tsx` | Demo 函数 |
+| `apps/demo/src/components/ChartHoverShell.tsx` | Demo Tooltip 壳（基于 kit Tooltip） |
+
+> 入场动画统一由 core 的 `<Animation playbook>` 驱动。
 
 ## 仪表盘示例
 
+图表入场与持续动画统一用 `<Animation playbook>`，子节点写最终视觉值（可用命名 `id` 作为 target）。几何上：`sweep-flag=1`（顺时针），`large-arc-flag=0`（短弧），从 225° 顺时针 90° 到 315°。
+
 ```tsx
-import { Path, Line, Text, Ellipse } from '../components/ReactVizComposer';
-import { ChartFrame, PLOT_WIDTH, PLOT_HEIGHT } from './shared/ChartFrame';
-import { animValue } from './shared/useEntryProgress.ts';
-import { SEMANTIC_6, AXIS_COLOR, TEXT_COLOR } from './shared/palette';
+import { Animation, Path, Line, Text, Ellipse } from '@react-viz-composer/core';
+import { ChartFrame, PLOT_WIDTH, PLOT_HEIGHT, SEMANTIC_6, TEXT_COLOR } from '@react-viz-composer/kit';
 
 export function GaugeChart({ value = 72, min = 0, max = 100 }) {
   const cx = PLOT_WIDTH / 2;
   const cy = PLOT_HEIGHT - 30;
   const outerR = 130;
   const innerR = outerR * 0.7;
-  const startAngleDeg = 225;       // 左下
-  const endAngleDeg = 315;         // 右下（等价 -45）
-  const totalArc = endAngleDeg - startAngleDeg; // = 90（顺时针）
-
+  const arcCenterR = (innerR + outerR) / 2;
+  const startAngleDeg = 225;
+  const totalArc = 90;
   const valueRatio = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
-  function degToRad(deg: number): number {
-    return (deg * Math.PI) / 180;
-  }
-
-  // 顺时针弧线 SVG path
-  function arcPath(r: number, fromRatio: number, toRatio: number): string {
-    const fromDeg = startAngleDeg + totalArc * fromRatio;
-    const toDeg = startAngleDeg + totalArc * toRatio;
-    const fromRad = degToRad(fromDeg);
-    const toRad = degToRad(toDeg);
-    const x0 = cx + r * Math.cos(fromRad);
-    const y0 = cy + r * Math.sin(fromRad);
-    const x1 = cx + r * Math.cos(toRad);
-    const y1 = cy + r * Math.sin(toRad);
-    return `M ${x0} ${y0} A ${r} ${r} 0 0 1 ${x1} ${y1}`;
-  }
+  function arcPath(r: number, fromRatio: number, toRatio: number): string { /* ... */ }
+  function pointerPoints(ratio: number) { /* ... */ }
 
   return (
-    <ChartFrame entryDuration={900}>
-      {(progress) => (
-        <>
-          {/* 轨道 */}
-          <Path d={arcPath(outerR, 0, 1)} fill="none" stroke="#f0f0f0"
-            strokeWidth={outerR - innerR} zIndex={0} />
-          {/* 进度 */}
-          <Path d={arcPath(innerR, 0, animValue(valueRatio, progress))}
-            fill="none" stroke={SEMANTIC_6[0]}
-            strokeWidth={outerR - innerR} zIndex={1} />
-          {/* 指针 */}
-          {(() => {
-            const ratio = animValue(valueRatio, progress);
-            const deg = startAngleDeg + totalArc * ratio;
-            const rad = degToRad(deg);
-            const px = cx + (innerR - 20) * Math.cos(rad);
-            const py = cy + (innerR - 20) * Math.sin(rad);
-            return <Line points={[{ x: cx, y: cy }, { x: px, y: py }]}
-              stroke={SEMANTIC_6[3]} strokeWidth={3} />;
-          })()}
-          <Ellipse cx={cx} cy={cy} rx={8} ry={8} fill={SEMANTIC_6[3]} />
-          <Text x={cx} y={cy - 8} text={String(Math.round(animValue(value, progress)))}
-            fontSize={28} fontWeight="bold" fontFamily="sans-serif" fill={TEXT_COLOR}
-            textAlign="middle" />
-          <Text x={cx} y={cy + 16} text={`/ ${max}`} fontSize={12}
-            fontFamily="sans-serif" fill={TEXT_COLOR} textAlign="middle" />
-        </>
-      )}
+    <ChartFrame>
+      <Path d={arcPath(arcCenterR, 0, 1)} fill="none" stroke="#f0f0f0"
+        strokeWidth={outerR - innerR} />
+      <Animation playbook={[
+        {
+          duration: 900, easing: 'easeOutCubic', targets: 'progress-arc',
+          compute: ({ progress }) => ({ d: arcPath(arcCenterR, 0, valueRatio * progress) }),
+        },
+        {
+          duration: 900, easing: 'easeOutCubic', targets: 'pointer',
+          compute: ({ progress }) => ({ points: pointerPoints(valueRatio * progress) }),
+        },
+        {
+          duration: 900, easing: 'easeOutCubic', targets: 'value-text',
+          compute: ({ progress }) => ({
+            text: String(Math.round(min + valueRatio * progress * (max - min))),
+          }),
+        },
+      ]}>
+        <Path id="progress-arc" d={arcPath(arcCenterR, 0, valueRatio)}
+          fill="none" stroke={SEMANTIC_6[0]} strokeWidth={outerR - innerR} />
+        <Line id="pointer" points={pointerPoints(valueRatio)}
+          stroke={SEMANTIC_6[3]} strokeWidth={3} />
+        <Text id="value-text" x={cx} y={cy - 8} text={String(value)}
+          fontSize={28} fontWeight="bold" fill={TEXT_COLOR} textAlign="middle" />
+      </Animation>
+      <Ellipse cx={cx} cy={cy} rx={8} ry={8} fill={SEMANTIC_6[3]} />
+      <Text x={cx} y={cy + 16} text={`/ ${max}`} fontSize={12}
+        fill={TEXT_COLOR} textAlign="middle" />
     </ChartFrame>
   );
 }
 ```
-
-关键点：`sweep-flag=1`（顺时针），`large-arc-flag=0`（短弧），从 225° 顺时针 90° 到 315°，走过下半圆。
 
 ## 视口裁剪
 
@@ -440,8 +462,8 @@ ReactVizComposer 支持基于可见区域的节点裁剪，减少大数据量时
 
 ## 添加新图表流程
 
-1. 在 `src/charts/` 创建 `NewChart.tsx`，遵循图表开发模式
-2. 在 `src/charts/shared/mockData.ts` 追加 mock 数据
-3. 在 `src/components/ChartDemos.tsx` 添加 import 和 Demo 函数
-4. 在 `src/App.tsx` 的 `buildGroups()` 中添加条目
+1. 在 `apps/charts/src/` 创建 `NewChart.tsx`，遵循图表开发模式
+2. 在 `apps/charts/src/mockData.ts` 追加 mock 数据
+3. 在 `apps/demo/src/components/ChartDemos.tsx` 添加 import 和 Demo 函数
+4. 在 `apps/demo/src/App.tsx` 的 `buildGroups()` 中添加条目
 5. 运行 `npx tsc --noEmit` 验证

@@ -4,6 +4,8 @@ import { getGroupBounds } from '../utils/bounds';
 import { isElementVisible, isPointerEventsEnabled } from '../utils/elements';
 import { sortByPaintOrder } from '../utils/paintOrder';
 import { pointToSegmentDist } from '../utils/maths';
+import { SpatialIndex } from '../utils/spatialIndex';
+import { hitTestPoints } from '../utils/points';
 /** 容器级绑定的 pointer 事件类型列表（不含 click/dblclick，它们由 pointer 事件自动触发） */
 const BOUND_POINTER_EVENTS = [
     'pointerdown',
@@ -43,6 +45,7 @@ class EventSystem {
     panLastClientY = 0;
     hitCtx;
     pathCache = new Path2DCache(512);
+    spatialIndex = new SpatialIndex(64);
     constructor(model) {
         this.model = model;
         const canvas = document.createElement('canvas');
@@ -77,12 +80,15 @@ class EventSystem {
     /**
      * 同步 Canvas 渲染模式下的元素列表（用于逆序命中检测）
      * 排除 defs 类节点（渐变/裁剪/滤镜/遮罩），它们不参与命中测试
+     * @param elements 可命中元素列表
+     * @param visible 视口裁剪区域（世界坐标），null 表示不过滤
      */
-    syncCanvasElements(elements) {
+    syncCanvasElements(elements, visible = null) {
         const drawable = elements.filter((e) => !e.removed
             && e.type !== 'linearGradient' && e.type !== 'radialGradient'
             && e.type !== 'clipPath' && e.type !== 'filter' && e.type !== 'mask');
         this.canvasElements = sortByPaintOrder(drawable);
+        this.spatialIndex.rebuild(this.canvasElements, visible);
     }
     /** 设置当前视口状态 */
     setViewport(v) {
@@ -259,8 +265,9 @@ class EventSystem {
     }
     /** 构建从目标元素到根的事件冒泡路径 */
     buildBubblePath(targetId) {
+        const elementId = this.resolveElementId(targetId);
         const path = [];
-        let current = this.model.getElement(targetId);
+        let current = this.model.getElement(elementId);
         while (current) {
             path.push(current.id);
             if (current.parentId) {
@@ -271,6 +278,17 @@ class EventSystem {
             }
         }
         return path;
+    }
+    /**
+     * 从命中 id 解析元素 id（支持 Points 的 id#index 格式）
+     * @param targetId 命中目标 id
+     */
+    resolveElementId(targetId) {
+        const hash = targetId.indexOf('#');
+        if (hash <= 0)
+            return targetId;
+        const elementId = targetId.slice(0, hash);
+        return this.model.getElement(elementId) ? elementId : targetId;
     }
     /** 在指定元素上调用事件处理器，临时设置 currentTarget */
     invokeHandler(id, type, event) {
@@ -317,8 +335,10 @@ class EventSystem {
         while (current && current !== this.boundContainer) {
             if (current instanceof SVGElement) {
                 const vizId = current.getAttribute('data-viz-id');
-                if (vizId && this.model.getElement(vizId)) {
-                    return vizId;
+                if (vizId) {
+                    const baseId = vizId.includes('#') ? vizId.split('#')[0] : vizId;
+                    if (this.model.getElement(baseId))
+                        return vizId;
                 }
             }
             current = current.parentElement;
@@ -333,8 +353,16 @@ class EventSystem {
         const { x: vx, y: vy, scale } = this.viewport;
         const worldX = offsetX / scale - vx;
         const worldY = offsetY / scale - vy;
-        for (let i = this.canvasElements.length - 1; i >= 0; i--) {
-            const record = this.canvasElements[i];
+        const spatialHits = this.spatialIndex.query(worldX, worldY);
+        let searchList;
+        if (spatialHits.length > 0) {
+            const hitIds = new Set(spatialHits.map((r) => r.id));
+            searchList = [...this.canvasElements].reverse().filter((r) => hitIds.has(r.id));
+        }
+        else {
+            searchList = [...this.canvasElements].reverse();
+        }
+        for (const record of searchList) {
             if (!isElementVisible(this.model, record))
                 continue;
             if (!isPointerEventsEnabled(this.model, record))
@@ -343,6 +371,12 @@ class EventSystem {
             if (record.type === 'group') {
                 if (this.testGroup(record, lx, ly))
                     return record.id;
+                continue;
+            }
+            if (record.type === 'points') {
+                const idx = hitTestPoints(record.data, lx, ly);
+                if (idx >= 0)
+                    return `${record.id}#${idx}`;
                 continue;
             }
             if (this.testShape(record, lx, ly)) {
@@ -400,6 +434,8 @@ class EventSystem {
                 return this.testText(record.data, x, y);
             case 'image':
                 return this.testImage(record.data, x, y);
+            case 'points':
+                return hitTestPoints(record.data, x, y) >= 0;
             default:
                 return false;
         }

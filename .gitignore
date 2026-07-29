@@ -15,6 +15,9 @@ dist-ssr
 # TypeScript build info
 *.tsbuildinfo
 
+# Accidental tsc emit into src/ (keep only .ts/.tsx sources)
+packages/**/src/**/*.js
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

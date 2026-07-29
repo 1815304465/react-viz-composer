@@ -1,5 +1,5 @@
 import type { LinearGradientData, GradientStop } from '../../engine/types';
-import { useRegisterNode } from '../../context';
+import { useShapeElement } from '../register';
 
 interface StopProps {
   offset: number;
@@ -8,6 +8,7 @@ interface StopProps {
 }
 
 interface Props {
+  /** 渐变 id，供 fill="url(#id)" 引用 */
   id: string;
   x1?: number;
   y1?: number;
@@ -18,38 +19,36 @@ interface Props {
 }
 
 /**
- * LinearGradient —— 线性渐变定义
+ * LinearGradient —— 线性渐变定义（纯代理）
  *
- * 通过 useRegisterNode 声明式注册到 SceneTree（挂在 defs 容器里）。
- * 其他形状通过 fill="url(#id)" 引用它。
+ * 经 useShapeElement 注册到 SceneTree；其他形状通过 fill="url(#id)" 引用。
  */
-function LinearGradient({
-  id,
-  x1 = 0, y1 = 0, x2 = 1, y2 = 0,
-  gradientUnits = 'objectBoundingBox',
-  stops,
-}: Props) {
-  useRegisterNode(
+function LinearGradient(props: Props) {
+  const {
     id,
-    () => ({
-      id,
-      type: 'linearGradient',
-      data: {
-        id,
-        x1, y1, x2, y2,
-        gradientUnits,
-        stops: stops.map((s): GradientStop => ({
-          offset: s.offset,
-          color: s.color,
-          opacity: s.opacity,
-        })),
-      } as LinearGradientData,
-      dirty: true,
-      subtreeDirty: true,
-    }),
-    [id, x1, y1, x2, y2, gradientUnits, stops],
-  );
+    x1 = 0,
+    y1 = 0,
+    x2 = 1,
+    y2 = 0,
+    gradientUnits = 'objectBoundingBox',
+    stops,
+  } = props;
 
+  const data: LinearGradientData = {
+    id,
+    x1,
+    y1,
+    x2,
+    y2,
+    gradientUnits,
+    stops: stops.map((s): GradientStop => ({
+      offset: s.offset,
+      color: s.color,
+      opacity: s.opacity,
+    })),
+  };
+
+  useShapeElement('linearGradient', id, data, {});
   return null;
 }
 

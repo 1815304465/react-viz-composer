@@ -1,6 +1,14 @@
 import { isEqual } from 'lodash-es';
 import type { ElementRecord, ElementType, ElementData, VizEventType, VizEventHandler } from './types';
+import type { SceneNode, SceneTree } from './graph/SceneTree';
 import { IDENTITY_MAT3, type Mat3 } from './utils/constants/matrix';
+
+/** SceneTree → Model 同步变更摘要 */
+interface SyncDelta {
+  newIds: string[];
+  updatedIds: string[];
+  removedIds: string[];
+}
 
 /**
  * Model —— 渲染器使用的数据仓库（树形）
@@ -60,38 +68,78 @@ class Model {
    * @param sceneRoot SceneTree 根节点
    * @returns 变更摘要：新增 / 更新 / 删除的 id 列表
    */
-  syncFromSceneTree(
-    sceneRoot: import('./graph/SceneTree').SceneNode,
-  ): { newIds: string[]; updatedIds: string[]; removedIds: string[] } {
-    const newIds: string[] = [];
-    const updatedIds: string[] = [];
-    const removedIds: string[] = [];
+  syncFromSceneTree(sceneRoot: SceneNode): SyncDelta {
+    const delta: SyncDelta = { newIds: [], updatedIds: [], removedIds: [] };
+    const visit = this.createSceneVisitor(delta);
 
-    // 1. 递归将 SceneTree 的节点 upsert 到 Model
-    const visit = (sceneNode: import('./graph/SceneTree').SceneNode, parent: ElementRecord | null) => {
+    this.syncChildren(null, sceneRoot.children ?? [], visit, delta.newIds, delta.updatedIds);
+
+    const sceneIds = new Set<string>();
+    const collectIds = (n: SceneNode) => {
+      sceneIds.add(n.id);
+      n.children?.forEach(collectIds);
+    };
+    sceneRoot.children?.forEach(collectIds);
+
+    for (const id of this.elements.keys()) {
+      if (!sceneIds.has(id)) {
+        this.removedIds.add(id);
+        delta.removedIds.push(id);
+      }
+    }
+
+    return delta;
+  }
+
+  /**
+   * 增量同步脏子树根节点（跳过全树遍历与删除检测）
+   * @param sceneTree SceneTree 实例
+   * @param dirtyRootIds 脏子树根 id 列表
+   */
+  syncDirtyNodes(sceneTree: SceneTree, dirtyRootIds: string[]): SyncDelta {
+    const delta: SyncDelta = { newIds: [], updatedIds: [], removedIds: [] };
+    const visit = this.createSceneVisitor(delta);
+
+    for (const id of dirtyRootIds) {
+      const sceneNode = sceneTree.getNode(id);
+      if (!sceneNode) continue;
+      const parent = sceneNode.parentId
+        ? this.elements.get(sceneNode.parentId) ?? null
+        : null;
+      visit(sceneNode, parent);
+    }
+
+    return delta;
+  }
+
+  /**
+   * 创建 SceneTree 节点访问器（upsert 到 Model）
+   * @param delta 变更摘要累加器
+   */
+  private createSceneVisitor(delta: SyncDelta): (sceneNode: SceneNode, parent: ElementRecord | null) => void {
+    const visit = (sceneNode: SceneNode, parent: ElementRecord | null): void => {
       const existing = this.elements.get(sceneNode.id);
       if (existing) {
-        // 更新现有元素
         const dataChanged = this.mergeData(existing.data, sceneNode.data);
         if (dataChanged) {
           existing.dirty = true;
           existing.worldMatrixDirty = true;
-          updatedIds.push(sceneNode.id);
+          delta.updatedIds.push(sceneNode.id);
         }
         if (sceneNode.events) {
           existing.events = { ...sceneNode.events };
+          existing.dirty = true;
         }
-        // 父子引用若变化，更新
         if (existing.parent !== parent) {
           existing.parent = parent;
           existing.parentId = parent?.id;
           existing.dirty = true;
           existing.worldMatrixDirty = true;
         }
-        // 递归处理 children
-        this.syncChildren(existing, sceneNode.children ?? [], visit, newIds, updatedIds);
+        if (sceneNode.subtreeDirty) {
+          this.syncChildren(existing, sceneNode.children ?? [], visit, delta.newIds, delta.updatedIds);
+        }
       } else {
-        // 新增元素
         const record = this.createRecord(
           sceneNode.id,
           sceneNode.type,
@@ -105,31 +153,11 @@ class Model {
         } else {
           this.topLevel.push(record);
         }
-        newIds.push(record.id);
-        // 递归处理 children
-        this.syncChildren(record, sceneNode.children ?? [], visit, newIds, updatedIds);
+        delta.newIds.push(record.id);
+        this.syncChildren(record, sceneNode.children ?? [], visit, delta.newIds, delta.updatedIds);
       }
     };
-
-    // 2. 处理根的 children
-    this.syncChildren(null, sceneRoot.children ?? [], visit, newIds, updatedIds);
-
-    // 3. 检测 Model 中多余的（SceneTree 没有的）→ 标记移除
-    const sceneIds = new Set<string>();
-    const collectIds = (n: import('./graph/SceneTree').SceneNode) => {
-      sceneIds.add(n.id);
-      n.children?.forEach(collectIds);
-    };
-    sceneRoot.children?.forEach(collectIds);
-
-    for (const id of this.elements.keys()) {
-      if (!sceneIds.has(id)) {
-        this.removedIds.add(id);
-        removedIds.push(id);
-      }
-    }
-
-    return { newIds, updatedIds, removedIds };
+    return visit;
   }
 
   /**
@@ -142,8 +170,8 @@ class Model {
    */
   private syncChildren(
     parent: ElementRecord | null,
-    children: import('./graph/SceneTree').SceneNode[],
-    visit: (n: import('./graph/SceneTree').SceneNode, p: ElementRecord | null) => void,
+    children: SceneNode[],
+    visit: (n: SceneNode, p: ElementRecord | null) => void,
     _newIds: string[],
     _updatedIds: string[],
   ): void {
@@ -325,4 +353,4 @@ class Model {
   }
 }
 
-export { Model };
+export { Model, type SyncDelta };

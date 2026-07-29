@@ -1,15 +1,14 @@
 /**
- * ChartHoverShell —— App 层图表 Hover 浮层
+ * ChartHoverShell —— Demo 层 Hover + Tooltip
  *
- * Tooltip UI 与状态由文档站（App）持有；图表仅通过 onItemEnter/onItemLeave 回调上报数据。
- * 无法在 App 外单独实现 hover 的原因：具体可交互元素（Rect/Ellipse 等）由图表组件内部创建，
- * App 无法在不改图表 API 的情况下直接绑定 onMouseEnter。
+ * 使用 kit 的 Tooltip 半成品；样式可通过 Tooltip props 覆盖。
  */
 
 import {
   useState, useCallback, type ReactNode,
 } from 'react';
 import type { VizEvent } from '@react-viz-composer/core';
+import { Tooltip } from '@react-viz-composer/kit';
 
 interface TooltipState {
   visible: boolean;
@@ -30,7 +29,7 @@ interface ShellProps {
 }
 
 /**
- * 包裹 ChartFrame 图表，提供 hover 浮层（position 相对 ChartFrame 外框）
+ * 包裹图表演示，提供受控 Tooltip
  */
 export function ChartHoverShell(props: ShellProps) {
   const { children } = props;
@@ -42,8 +41,8 @@ export function ChartHoverShell(props: ShellProps) {
   const show = useCallback((content: string, evt: VizEvent) => {
     setTip({
       visible: true,
-      x: evt.offsetX + 12,
-      y: evt.offsetY + 12,
+      x: evt.offsetX,
+      y: evt.offsetY,
       content,
     });
   }, []);
@@ -53,30 +52,17 @@ export function ChartHoverShell(props: ShellProps) {
   }, []);
 
   return (
-    <div style={{ position: 'relative', display: 'inline-block' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       {children({ show, hide })}
-      {tip.visible && (
-        <div
-          style={{
-            position: 'absolute',
-            left: tip.x,
-            top: tip.y,
-            zIndex: 20,
-            pointerEvents: 'none',
-            padding: '6px 10px',
-            background: 'rgba(0, 0, 0, 0.78)',
-            color: '#fff',
-            fontSize: 12,
-            lineHeight: 1.5,
-            borderRadius: 4,
-            whiteSpace: 'pre-line',
-            maxWidth: 240,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          }}
-        >
-          {tip.content}
-        </div>
-      )}
+      <Tooltip
+        visible={tip.visible}
+        x={tip.x}
+        y={tip.y}
+        offsetX={12}
+        offsetY={12}
+      >
+        {tip.content}
+      </Tooltip>
     </div>
   );
 }

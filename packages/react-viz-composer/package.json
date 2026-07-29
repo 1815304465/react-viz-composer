@@ -1,7 +1,7 @@
 {
   "name": "react-viz-composer",
   "version": "0.1.0",
-  "description": "Declarative SVG/Canvas hybrid rendering engine. Compose visualizations from Rect, Ellipse, Line, Path, Text, Image, Group, Animation primitives — with 48 built-in chart types.",
+  "description": "Declarative SVG/Canvas hybrid rendering engine. Compose visualizations from Rect, Ellipse, Line, Path, Text, Image, Group, Animation primitives.",
   "license": "MIT",
   "author": "tycho",
   "repository": {
@@ -22,7 +22,6 @@
     "renderer",
     "2d",
     "dataviz",
-    "charts",
     "graph"
   ],
   "type": "module",
@@ -31,19 +30,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
-    },
-    "./charts": {
-      "import": "./dist/charts/index.js",
-      "require": "./dist/charts/index.cjs",
-      "types": "./dist/charts/index.d.ts"
-    },
-    "./charts/shared/mockData": {
-      "import": "./dist/charts/mockData.js",
-      "require": "./dist/charts/mockData.cjs",
-      "types": "./dist/charts/mockData.d.ts"
     }
   },
   "files": [
@@ -60,9 +50,7 @@
   },
   "dependencies": {
     "@react-viz-composer/core": "*",
-    "@react-viz-composer/components": "*",
-    "@react-viz-composer/charts": "*",
-    "@react-viz-composer/utilities": "*"
+    "@react-viz-composer/kit": "*"
   },
   "peerDependencies": {
     "react": ">=18.0.0",

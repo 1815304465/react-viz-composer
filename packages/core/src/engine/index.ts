@@ -1,14 +1,14 @@
 // 类型
 export type {
   Point, Transform, Viewport,
-  RectData, EllipseData, LineData, PathData, TextData, ImageData,
+  RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData,
   GradientStop, LinearGradientData, RadialGradientData,
   ClipPathData, FilterData, MaskData, FilterEffect,
   GroupData, AnimationData,
   ElementType, ElementData,
   VizEventType, VizEventHandler, VizDragEvent, VizDragEventHandler,
   ElementRecord, EngineType, GraphOptions,
-  AnimStep, AnimAttribute, AnimEasing, AnimationHandle,
+  AnimStep, AnimAttribute, AnimEasing, AnimTarget, AnimComputeContext, AnimationHandle,
 } from './types';
 
 // 核心类

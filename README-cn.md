@@ -1,6 +1,6 @@
 # ⚡ ReactVizComposer
 
-声明式 SVG/Canvas 混合渲染引擎。将可视化拆解为 `Rect`、`Ellipse`、`Line`、`Path`、`Text`、`Image`、`Group`、`Animation` 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。内置 48 种图表，覆盖 ECharts 全部常见品类。
+声明式 SVG/Canvas 混合渲染引擎。将可视化拆解为 `Rect`、`Ellipse`、`Line`、`Path`、`Text`、`Image`、`Group`、`Animation` 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。仓库 `apps/charts` 中另有 48 种参考图表实现（不随 npm 发布）。
 
 [![npm version](https://img.shields.io/npm/v/react-viz-composer)](https://www.npmjs.com/package/react-viz-composer)
 [![license](https://img.shields.io/npm/l/react-viz-composer)](./LICENSE)
@@ -9,7 +9,7 @@
 
 - **声明式数据驱动** — 写 JSX 描述形状，引擎负责渲染
 - **SVG/Canvas 双引擎** — `engine="svg"` 增量 DOM 更新，`engine="canvas"` 全量重绘 + 视口裁剪
-- **48 种内置图表** — 柱状图、折线图、散点图、饼图、雷达图、K线图、热力图、桑基图、矩形树图、旭日图等
+- **构图积木 Kit** — `ChartFrame`、`Axis`、scales、色板，通过 `@react-viz-composer/kit`（亦由 `react-viz-composer` 再导出）
 - **零 DOM 形状组件** — 形状组件是纯代理（`return null`），渲染完全在引擎层进行
 - **合成事件系统** — `onClick`、`onMouseEnter`、`onDrag` 等，支持 `stopPropagation()` 阻止冒泡
 - **声明式动画** — Tween 剧本，支持分组并行/串行、循环、watch 触发
@@ -20,6 +20,8 @@
 
 ```bash
 npm install react-viz-composer
+# 或分别安装：
+# npm install @react-viz-composer/core @react-viz-composer/kit
 ```
 
 需要 `react` 和 `react-dom` 作为 peer dependencies（>=18.0.0）。
@@ -39,25 +41,46 @@ function MyFirstChart() {
 }
 ```
 
-### 使用内置图表
+### 用 Kit 组合图表
 
 ```tsx
-import { BarChart } from 'react-viz-composer/charts';
+import { Animation, Rect } from 'react-viz-composer';
+import {
+  ChartFrame, PLOT_WIDTH, PLOT_HEIGHT,
+  scaleBand, scaleLinear, Axis, Grid, SEMANTIC_6,
+} from 'react-viz-composer';
+// 或：from '@react-viz-composer/kit'
 
-function App() {
+function SimpleBarChart({ data }) {
+  const categories = data.map((d) => d.month);
+  const xScale = scaleBand(categories, [0, PLOT_WIDTH], 0.3);
+  const yScale = scaleLinear([0, 300], [PLOT_HEIGHT, 0]);
+
   return (
-    <BarChart
-      data={[
-        { month: '1月', value: 120 },
-        { month: '2月', value: 200 },
-        { month: '3月', value: 150 },
-      ]}
-      onItemEnter={(d, evt) => console.log(d.month)}
-      onItemLeave={() => {}}
-    />
+    <ChartFrame>
+      <Grid scale={yScale} orient="y" />
+      <Animation playbook={[
+        { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children' },
+      ]}>
+        {data.map((d) => (
+          <Rect
+            key={d.month}
+            x={xScale(d.month)}
+            y={yScale(d.value)}
+            width={xScale.bandwidth}
+            height={PLOT_HEIGHT - yScale(d.value)}
+            fill={SEMANTIC_6[0]}
+          />
+        ))}
+      </Animation>
+      <Axis scale={xScale} orient="bottom" />
+      <Axis scale={yScale} orient="left" />
+    </ChartFrame>
   );
 }
 ```
+
+参考图表实现（柱状图、折线图、饼图、桑基图等）位于仓库 `apps/charts`，供 demo 使用，**不随 npm 包发布**。
 
 ## 📚 API
 
@@ -80,19 +103,20 @@ function App() {
 
 | 组件 | 关键属性 |
 |------|---------|
-| `<Rect>` | `x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
-| `<Ellipse>` | `cx, cy, rx, ry, fill, stroke, strokeWidth, opacity, clipPath, filter, mask` |
-| `<Line>` | `points: {x,y}[], stroke, strokeWidth, closed, clipPath, filter, mask` |
-| `<Path>` | `d: string, fill, stroke, clipPath, filter, mask` |
-| `<Text>` | `text, x, y, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline, filter, mask` |
-| `<Image>` | `src, x, y, width, height, clipPath, filter, mask` |
-| `<Group>` | `x, y, rotation, scaleX, scaleY, opacity, children, filter, mask` |
+| `<Rect>` | `x, y, width, height, rx, ry, fill, stroke, strokeWidth, opacity` |
+| `<Ellipse>` | `cx, cy, rx, ry, fill, stroke, strokeWidth, opacity` |
+| `<Line>` | `points: {x,y}[], stroke, strokeWidth, closed` |
+| `<Path>` | `d: string, fill, stroke` |
+| `<Text>` | `text, x, y, fontSize, fontFamily, fontWeight, fill, textAlign, textBaseline` |
+| `<Image>` | `src, x, y, width, height` |
+| `<Points>` | `cx: number[], cy: number[], rx?, ry?, fill?, stroke?` |
+| `<Group>` | `x, y, rotation, scaleX, scaleY, opacity, children` |
 | `<Animation>` | `playbook: AnimStep[], autoPlay, children` |
-| `<LinearGradient>` | `id, x1, y1, x2, y2, stops` |
-| `<RadialGradient>` | `id, cx, cy, r, stops` |
-| `<ClipPath>` | `id, shapeType, shapeData` |
-| `<Filter>` | `id, effects: FilterEffect[]` |
-| `<Mask>` | `id, shapeType, shapeData, maskMode` |
+| `<LinearGradient>` | `id`（供 `fill="url(#id)"` 引用）, `x1, y1, x2, y2, stops` |
+| `<RadialGradient>` | `id`（供 `fill="url(#id)"` 引用）, `cx, cy, r, stops` |
+| `<ClipPath>` | `clip: ReactElement, children` |
+| `<Filter>` | `effects: FilterEffect[], children` |
+| `<Mask>` | `mask: ReactElement, maskMode?, children` |
 
 ### 事件
 
@@ -108,49 +132,49 @@ function App() {
 />
 ```
 
-### 滤镜
+### ClipPath / Filter / Mask（容器）
+
+裁剪、滤镜、遮罩作用于各自的 **children** — 几何形状上不再使用 `url(#id)` 字符串 props。
 
 ```tsx
-<Filter id="blur-3" effects={[{ type: 'blur', value: 3 }]} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" filter="url(#blur-3)" />
+<ClipPath clip={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+  <Path d="..." />
+</ClipPath>
+
+<Filter effects={[{ type: 'blur', value: 3 }]}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Filter>
+
+<Mask mask={<Ellipse cx={100} cy={100} rx={50} ry={50} />}>
+  <Rect x={50} y={50} width={200} height={200} fill="blue" />
+</Mask>
 ```
 
-支持：`blur`、`brightness`、`contrast`、`dropShadow`、`grayscale`、`opacity`、`saturate`、`sepia`、`hueRotate`。
-
-### 遮罩
-
-```tsx
-<Mask id="circle-mask" shapeType="ellipse"
-  shapeData={{ cx: 100, cy: 100, rx: 50, ry: 50 }} />
-<Rect x={50} y={50} width={200} height={200} fill="blue" mask="url(#circle-mask)" />
-```
+滤镜效果：`blur`、`brightness`、`contrast`、`dropShadow`、`grayscale`、`opacity`、`saturate`、`sepia`、`hueRotate`。
 
 ### 动画
+
+子节点写**最终视觉 props**；`from` 为入场起点。`targets: 'children'` 会穿透 ClipPath / Filter / Mask；也可用命名 `id` 作为 target。
 
 ```tsx
 <Animation
   playbook={[
-    { attribute: 'height', from: 0, to: 200, duration: 600, easing: 'easeOut' },
-    { attribute: 'opacity', from: 0, to: 1, duration: 400, group: 1 },
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOut', targets: 'children' },
+    { attribute: 'opacity', from: 0, duration: 400, group: 1, targets: 'children' },
   ]}
   autoPlay
 >
-  <Rect x={50} y={50} width={100} height={0} fill="blue" />
+  <Rect x={50} y={50} width={100} height={200} fill="blue" />
 </Animation>
 ```
 
-## 📊 内置图表
+## 📦 包结构
 
-从 `react-viz-composer/charts` 导入：
-
-| 分类 | 图表 |
-|------|------|
-| **基础** | BarChart, LineChart, ScatterChart, PieChart, DoughnutChart, AreaChart, StackedAreaChart, RadarChart, FunnelChart, HistogramChart, RoseChart, PolarBarChart, GaugeChart, LiquidFillChart, SingleAxisScatterChart |
-| **统计与业务** | BoxplotChart, ErrorBarChart, WaterfallChart, CandlestickChart, HeatmapChart, CalendarHeatmapChart, GanttChart, TimelineChart, ParallelCoordinatesChart, ThemeRiverChart, PictorialBarChart, DensityCloudChart, ContourChart, HorizontalBarChart, StackedBarChart, BidirectionalBarChart |
-| **层级与关系** | TreemapChart, SunburstChart, TreeChart, SankeyChart, ChordChart, VennChart, CircularGraphChart, NetworkGraphChart, WordCloudChart |
-| **组合与特色** | ComboChart, BubbleChart, ExplorableScatterChart, CurvatureCombChart, StepLineChart, SmoothLineChart, EffectScatterChart |
-
-所有图表遵循统一的 API 模式，支持 `data`、`onItemEnter`、`onItemLeave` props 和入场动画。
+| 包 | 职责 |
+|----|------|
+| `react-viz-composer` / `@react-viz-composer/core` | 引擎 + 形状原语 |
+| `@react-viz-composer/kit` | 构图积木（Frame、Axis、scales、色板） |
+| `apps/charts`（仅仓库） | 48 种参考图表实现，供 demo 使用 |
 
 ## 🏗️ 架构
 

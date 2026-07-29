@@ -1,20 +1,24 @@
 import { jsx as _jsx } from "react/jsx-runtime";
-import { useState, useRef, useEffect, useCallback, useId, forwardRef, useImperativeHandle, } from 'react';
-import { useViz, useVizFrame, useParentId, useSceneTree, AnimationContext, AnimAttrsContext, ParentIdContext, } from '../../context';
-import { isTransformAnimAttr, lerpAnimValue } from '../../engine/utils/animations';
-/* ---- 缓动 ---- */
-const easingFns = {
-    linear: (t) => t,
-    easeIn: (t) => t * t,
-    easeOut: (t) => t * (2 - t),
-    easeInOut: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
-};
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, } from 'react';
+import { useViz, useVizFrame, useSceneTree, ParentIdContext, } from '../../context';
+import { AnimPlayer } from '../../engine/utils/AnimPlayer';
+import { DEFAULT_TRANSFORM } from '../../engine/utils/animations';
+import { useShapeElement } from '../register';
 /* ---- 路径解析 ---- */
+/**
+ * 规范化属性路径
+ * @param path 路径字符串或数组
+ */
 function normalizePath(path) {
     if (Array.isArray(path))
         return path.filter(Boolean);
     return path.split('/').filter(Boolean);
 }
+/**
+ * 按路径读取对象字段
+ * @param obj 源对象
+ * @param path 路径
+ */
 function resolvePath(obj, path) {
     const parts = normalizePath(path);
     let cur = obj;
@@ -25,65 +29,76 @@ function resolvePath(obj, path) {
     }
     return cur;
 }
+/**
+ * 规范化 watch source
+ * @param s 字符串 id 或配置对象
+ */
 function normalizeSource(s) {
     if (typeof s === 'string')
         return { id: s };
     return s;
 }
-/* ---- 默认值 ---- */
-const DEFAULT_TRANSFORM = {
-    x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1,
-};
 /**
- * Animation —— 声明式动画容器（递归渲染版，纯代理）
- * 自身注册为 'animation' 节点挂在 SceneTree 中，提供 AnimationContext + AnimAttrsContext 给子节点合并。
- * 不渲染任何 DOM，只将动画状态通过 Context 和 SceneTree 传递到渲染层。
+ * Animation —— 声明式动画容器（纯代理）
  *
- * 每个 tick 的更新流程：
- *   1. 计算本帧 transform/attrs 值
- *   2. 写入 Context → 触发子节点 useShapeElement 的 update effect
- *   3. （可选）直接调 viz.update(自身id / 外部id) 写入 SceneTree
+ * React 层只声明 playbook / watch / 生命周期；每帧插值由引擎 AnimPlayer
+ * 经 requestFrame → SceneTree.update 完成，不触发 React 重渲染。
+ *
+ * 自身经 useShapeElement 注册为 `animation` 节点，通过 ParentIdContext 挂载子形状。
  */
 function Animation(props, ref) {
     const { id: propId, children, watch, playbook, onComplete, onCancel, autoPlay = true, } = props;
-    const { update, register, unregister } = useViz();
+    const { update } = useViz();
     const { enqueueJob, requestFrame } = useVizFrame();
     const sceneTree = useSceneTree();
-    const parentIdFromCtx = useParentId();
-    const autoId = useId();
-    const myId = propId ?? autoId;
-    const [transform, setTransform] = useState(DEFAULT_TRANSFORM);
-    const [attrs, setAttrs] = useState({});
+    const animData = { transform: { ...DEFAULT_TRANSFORM } };
+    const myId = useShapeElement('animation', propId, animData, {});
+    const playerRef = useRef(null);
+    const hostRef = useRef({
+        getNode: (id) => sceneTree.getNode(id),
+        getChildIds: (id) => sceneTree.getChildIds(id),
+        update,
+        requestFrame,
+        enqueueJob,
+    });
     const prevSnapshotRef = useRef(null);
-    const frameUnsubRef = useRef(null);
-    const stoppedRef = useRef(false);
-    const pausedRef = useRef(false);
-    const pauseOffsetRef = useRef(0);
-    const pauseStartRef = useRef(0);
     const autoPlayedRef = useRef(false);
     const watchRunningRef = useRef(false);
     const onCompleteRef = useRef(onComplete);
     const onCancelRef = useRef(onCancel);
-    const tickRef = useRef(null);
-    // 上一次推送到 SceneTree 的 transform 引用，避免无意义 update
-    const lastPushedTransformRef = useRef(null);
+    const playbookRef = useRef(playbook);
+    hostRef.current = {
+        getNode: (id) => sceneTree.getNode(id),
+        getChildIds: (id) => sceneTree.getChildIds(id),
+        update,
+        requestFrame,
+        enqueueJob,
+    };
     onCompleteRef.current = onComplete;
     onCancelRef.current = onCancel;
-    const hasWatch = watch && watch.sources.length > 0;
-    /** 注册 Animation 节点自身 */
-    useEffect(() => {
-        register(parentIdFromCtx, {
-            id: myId,
-            type: 'animation',
-            data: { transform: { ...DEFAULT_TRANSFORM } },
-            dirty: true,
-            subtreeDirty: true,
+    playbookRef.current = playbook;
+    const hasWatch = Boolean(watch && watch.sources.length > 0);
+    if (!playerRef.current) {
+        playerRef.current = new AnimPlayer({
+            getNode: (id) => hostRef.current.getNode(id),
+            getChildIds: (id) => hostRef.current.getChildIds(id),
+            update: (id, partial) => hostRef.current.update(id, partial),
+            requestFrame: (fn) => hostRef.current.requestFrame(fn),
+            enqueueJob: (fn, priority) => hostRef.current.enqueueJob(fn, priority),
         });
-        return () => unregister(myId);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [myId, parentIdFromCtx]);
+    }
+    useEffect(() => () => {
+        playerRef.current?.dispose();
+        playerRef.current = null;
+    }, [myId]);
+    /**
+     * 读取 watch 源快照
+     * @returns id → 值映射
+     */
     const snapshotWatched = useCallback(() => {
         const snap = {};
+        if (!watch)
+            return snap;
         for (const raw of watch.sources) {
             const s = normalizeSource(raw);
             const el = sceneTree.getNode(s.id);
@@ -96,192 +111,43 @@ function Animation(props, ref) {
         }
         return snap;
     }, [watch, sceneTree]);
-    const resetState = useCallback(() => {
-        setTransform(DEFAULT_TRANSFORM);
-        setAttrs({});
-        // 同步把 transform 推回 SceneTree
-        if (lastPushedTransformRef.current) {
-            update(myId, { data: { transform: { ...DEFAULT_TRANSFORM } } });
-            lastPushedTransformRef.current = null;
-        }
-    }, [update, myId]);
-    const cancelPlayback = useCallback((notify = true) => {
-        stoppedRef.current = true;
-        pausedRef.current = false;
-        pauseOffsetRef.current = 0;
-        frameUnsubRef.current?.();
-        frameUnsubRef.current = null;
-        resetState();
-        watchRunningRef.current = false;
-        if (notify)
-            onCancelRef.current?.();
-    }, [resetState]);
-    const ensureFrameLoop = useCallback(() => {
-        if (frameUnsubRef.current)
-            return;
-        frameUnsubRef.current = requestFrame(() => {
-            tickRef.current?.();
-        });
-    }, [requestFrame]);
     /**
-     * 把当前 transform 推回 SceneTree（去重）
-     * 这样 Animation 自身的 transform 也能被渲染器在递归时通过 worldMatrix 合成到子节点
+     * 播放当前 playbook
      */
-    const pushTransformToTree = useCallback((next) => {
-        const prev = lastPushedTransformRef.current;
-        if (prev
-            && prev.x === next.x && prev.y === next.y
-            && prev.rotation === next.rotation
-            && prev.scaleX === next.scaleX && prev.scaleY === next.scaleY) {
-            return;
-        }
-        lastPushedTransformRef.current = { ...next };
-        update(myId, { data: { transform: { ...next } } });
-    }, [update, myId]);
     const runPlaybook = useCallback(() => {
-        if (!playbook || playbook.length === 0)
+        const steps = playbookRef.current;
+        if (!steps?.length || !playerRef.current)
             return;
-        cancelPlayback(false);
-        stoppedRef.current = false;
-        pausedRef.current = false;
-        pauseOffsetRef.current = 0;
-        const groups = new Map();
-        for (const step of playbook) {
-            const g = step.group ?? 0;
-            if (!groups.has(g))
-                groups.set(g, []);
-            groups.get(g).push(step);
-        }
-        const sortedGroups = Array.from(groups.keys()).sort((a, b) => a - b);
-        const loopCounts = new Map();
-        for (const step of playbook) {
-            if (step.loop === true)
-                loopCounts.set(step, -1);
-            else if (typeof step.loop === 'number' && step.loop > 0)
-                loopCounts.set(step, step.loop);
-        }
-        const finalTransform = { ...DEFAULT_TRANSFORM };
-        const finalAttrs = {};
-        let groupIndex = 0;
-        let cycle = 0;
-        let groupStartTime = 0;
-        const finish = () => {
-            setTransform({ ...finalTransform });
-            setAttrs({ ...finalAttrs });
-            pushTransformToTree(finalTransform);
-            watchRunningRef.current = false;
-            frameUnsubRef.current?.();
-            frameUnsubRef.current = null;
-            if (onCompleteRef.current) {
-                enqueueJob(() => onCompleteRef.current?.());
-            }
-        };
-        const runNextGroup = () => {
-            if (stoppedRef.current)
-                return;
-            if (groupIndex >= sortedGroups.length) {
-                let needLoop = false;
-                for (const step of playbook) {
-                    const c = loopCounts.get(step);
-                    if (c === undefined)
-                        continue;
-                    if (c === -1) {
-                        needLoop = true;
-                        continue;
-                    }
-                    if (c > 0) {
-                        needLoop = true;
-                        if (c === 1)
-                            loopCounts.delete(step);
-                        else
-                            loopCounts.set(step, c - 1);
-                    }
-                }
-                if (needLoop) {
-                    groupIndex = 0;
-                    cycle++;
-                    runNextGroup();
-                    return;
-                }
-                finish();
-                return;
-            }
-            const groupKey = sortedGroups[groupIndex];
-            const steps = groups.get(groupKey);
-            const maxDuration = Math.max(...steps.map((s) => s.duration));
-            const isForward = cycle % 2 === 0;
-            groupStartTime = performance.now();
-            const tick = () => {
-                if (stoppedRef.current)
-                    return;
-                if (pausedRef.current)
-                    return;
-                const elapsed = performance.now() - groupStartTime - pauseOffsetRef.current;
-                const nextTransform = { ...finalTransform };
-                const nextAttrs = { ...finalAttrs };
-                for (const step of steps) {
-                    const progress = Math.min(elapsed / step.duration, 1);
-                    const fn = easingFns[step.easing ?? 'linear'];
-                    const isLooping = step.loop === true
-                        || (typeof step.loop === 'number' && step.loop > 0);
-                    if (!isLooping && !isForward)
-                        continue;
-                    const eased = fn(progress);
-                    const val = !isForward
-                        ? lerpAnimValue(step.to, step.from, eased)
-                        : lerpAnimValue(step.from, step.to, eased);
-                    if (isTransformAnimAttr(step.attribute)) {
-                        nextTransform[step.attribute] = val;
-                    }
-                    else {
-                        nextAttrs[step.attribute] = val;
-                    }
-                }
-                Object.assign(finalTransform, nextTransform);
-                Object.assign(finalAttrs, nextAttrs);
-                setTransform({ ...nextTransform });
-                setAttrs({ ...nextAttrs });
-                // 同步推 transform 到 SceneTree（子节点合并后的渲染层会处理）
-                pushTransformToTree(nextTransform);
-                if (elapsed >= maxDuration) {
-                    groupIndex++;
-                    runNextGroup();
-                    return;
-                }
-            };
-            tickRef.current = tick;
-            ensureFrameLoop();
-        };
-        runNextGroup();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [playbook, cancelPlayback, enqueueJob, ensureFrameLoop, pushTransformToTree]);
+        watchRunningRef.current = true;
+        playerRef.current.play({
+            containerId: myId,
+            playbook: steps,
+            onComplete: () => {
+                watchRunningRef.current = false;
+                onCompleteRef.current?.();
+            },
+            onCancel: () => {
+                watchRunningRef.current = false;
+                onCancelRef.current?.();
+            },
+        });
+    }, [myId]);
     useImperativeHandle(ref, () => ({
-        play: () => {
-            watchRunningRef.current = true;
-            runPlaybook();
+        play: () => runPlaybook(),
+        cancel: () => {
+            playerRef.current?.cancel(true, true);
+            watchRunningRef.current = false;
         },
-        cancel: () => cancelPlayback(true),
-        pause: () => {
-            if (stoppedRef.current || pausedRef.current)
-                return;
-            pausedRef.current = true;
-            pauseStartRef.current = performance.now();
-        },
-        resume: () => {
-            if (stoppedRef.current || !pausedRef.current)
-                return;
-            pauseOffsetRef.current += performance.now() - pauseStartRef.current;
-            pausedRef.current = false;
-            ensureFrameLoop();
-        },
-    }), [runPlaybook, cancelPlayback, ensureFrameLoop]);
+        pause: () => playerRef.current?.pause(),
+        resume: () => playerRef.current?.resume(),
+    }), [runPlaybook]);
     useEffect(() => {
         if (!hasWatch)
             return;
         prevSnapshotRef.current = snapshotWatched();
     }, [hasWatch, snapshotWatched]);
     useEffect(() => {
-        if (!hasWatch)
+        if (!hasWatch || !watch)
             return;
         const unsub = sceneTree.subscribe(() => {
             if (watchRunningRef.current)
@@ -290,26 +156,23 @@ function Animation(props, ref) {
             const oldSnap = prevSnapshotRef.current ?? {};
             prevSnapshotRef.current = newSnap;
             if (watch.handler(newSnap, oldSnap)) {
-                watchRunningRef.current = true;
                 runPlaybook();
             }
         });
         return unsub;
     }, [hasWatch, sceneTree, snapshotWatched, watch, runPlaybook]);
     useEffect(() => {
-        if (hasWatch || !autoPlay || !playbook || playbook.length === 0 || autoPlayedRef.current)
+        if (hasWatch || !autoPlay || !playbook || playbook.length === 0 || autoPlayedRef.current) {
             return;
+        }
         autoPlayedRef.current = true;
-        watchRunningRef.current = true;
-        runPlaybook();
+        // 延迟一帧：确保子节点已从 pending 队列 flush 进 SceneTree
+        const raf = requestAnimationFrame(() => {
+            runPlaybook();
+        });
+        return () => cancelAnimationFrame(raf);
     }, [hasWatch, autoPlay, playbook, runPlaybook]);
-    useEffect(() => () => {
-        stoppedRef.current = true;
-        frameUnsubRef.current?.();
-        frameUnsubRef.current = null;
-        autoPlayedRef.current = false;
-    }, []);
-    return (_jsx(ParentIdContext.Provider, { value: myId, children: _jsx(AnimationContext.Provider, { value: transform, children: _jsx(AnimAttrsContext.Provider, { value: attrs, children: children }) }) }));
+    return (_jsx(ParentIdContext.Provider, { value: myId, children: children }));
 }
 const AnimationWithRef = forwardRef(Animation);
 export { AnimationWithRef as Animation };

@@ -1,0 +1,27 @@
+{
+  "name": "@react-viz-composer/charts",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Reference chart implementations for ReactVizComposer demos (not published)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mockData": "./src/mockData.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "@react-viz-composer/core": "*",
+    "@react-viz-composer/kit": "*"
+  },
+  "devDependencies": {
+    "@react-viz-composer/core": "*",
+    "@react-viz-composer/kit": "*",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~6.0.2"
+  }
+}

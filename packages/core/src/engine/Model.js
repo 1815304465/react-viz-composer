@@ -49,51 +49,9 @@ class Model {
      * @returns 变更摘要：新增 / 更新 / 删除的 id 列表
      */
     syncFromSceneTree(sceneRoot) {
-        const newIds = [];
-        const updatedIds = [];
-        const removedIds = [];
-        // 1. 递归将 SceneTree 的节点 upsert 到 Model
-        const visit = (sceneNode, parent) => {
-            const existing = this.elements.get(sceneNode.id);
-            if (existing) {
-                // 更新现有元素
-                const dataChanged = this.mergeData(existing.data, sceneNode.data);
-                if (dataChanged) {
-                    existing.dirty = true;
-                    existing.worldMatrixDirty = true;
-                    updatedIds.push(sceneNode.id);
-                }
-                if (sceneNode.events) {
-                    existing.events = { ...sceneNode.events };
-                }
-                // 父子引用若变化，更新
-                if (existing.parent !== parent) {
-                    existing.parent = parent;
-                    existing.parentId = parent?.id;
-                    existing.dirty = true;
-                    existing.worldMatrixDirty = true;
-                }
-                // 递归处理 children
-                this.syncChildren(existing, sceneNode.children ?? [], visit, newIds, updatedIds);
-            }
-            else {
-                // 新增元素
-                const record = this.createRecord(sceneNode.id, sceneNode.type, sceneNode.data, sceneNode.events, parent);
-                this.elements.set(record.id, record);
-                if (parent) {
-                    parent.children.push(record);
-                }
-                else {
-                    this.topLevel.push(record);
-                }
-                newIds.push(record.id);
-                // 递归处理 children
-                this.syncChildren(record, sceneNode.children ?? [], visit, newIds, updatedIds);
-            }
-        };
-        // 2. 处理根的 children
-        this.syncChildren(null, sceneRoot.children ?? [], visit, newIds, updatedIds);
-        // 3. 检测 Model 中多余的（SceneTree 没有的）→ 标记移除
+        const delta = { newIds: [], updatedIds: [], removedIds: [] };
+        const visit = this.createSceneVisitor(delta);
+        this.syncChildren(null, sceneRoot.children ?? [], visit, delta.newIds, delta.updatedIds);
         const sceneIds = new Set();
         const collectIds = (n) => {
             sceneIds.add(n.id);
@@ -103,10 +61,72 @@ class Model {
         for (const id of this.elements.keys()) {
             if (!sceneIds.has(id)) {
                 this.removedIds.add(id);
-                removedIds.push(id);
+                delta.removedIds.push(id);
             }
         }
-        return { newIds, updatedIds, removedIds };
+        return delta;
+    }
+    /**
+     * 增量同步脏子树根节点（跳过全树遍历与删除检测）
+     * @param sceneTree SceneTree 实例
+     * @param dirtyRootIds 脏子树根 id 列表
+     */
+    syncDirtyNodes(sceneTree, dirtyRootIds) {
+        const delta = { newIds: [], updatedIds: [], removedIds: [] };
+        const visit = this.createSceneVisitor(delta);
+        for (const id of dirtyRootIds) {
+            const sceneNode = sceneTree.getNode(id);
+            if (!sceneNode)
+                continue;
+            const parent = sceneNode.parentId
+                ? this.elements.get(sceneNode.parentId) ?? null
+                : null;
+            visit(sceneNode, parent);
+        }
+        return delta;
+    }
+    /**
+     * 创建 SceneTree 节点访问器（upsert 到 Model）
+     * @param delta 变更摘要累加器
+     */
+    createSceneVisitor(delta) {
+        const visit = (sceneNode, parent) => {
+            const existing = this.elements.get(sceneNode.id);
+            if (existing) {
+                const dataChanged = this.mergeData(existing.data, sceneNode.data);
+                if (dataChanged) {
+                    existing.dirty = true;
+                    existing.worldMatrixDirty = true;
+                    delta.updatedIds.push(sceneNode.id);
+                }
+                if (sceneNode.events) {
+                    existing.events = { ...sceneNode.events };
+                    existing.dirty = true;
+                }
+                if (existing.parent !== parent) {
+                    existing.parent = parent;
+                    existing.parentId = parent?.id;
+                    existing.dirty = true;
+                    existing.worldMatrixDirty = true;
+                }
+                if (sceneNode.subtreeDirty) {
+                    this.syncChildren(existing, sceneNode.children ?? [], visit, delta.newIds, delta.updatedIds);
+                }
+            }
+            else {
+                const record = this.createRecord(sceneNode.id, sceneNode.type, sceneNode.data, sceneNode.events, parent);
+                this.elements.set(record.id, record);
+                if (parent) {
+                    parent.children.push(record);
+                }
+                else {
+                    this.topLevel.push(record);
+                }
+                delta.newIds.push(record.id);
+                this.syncChildren(record, sceneNode.children ?? [], visit, delta.newIds, delta.updatedIds);
+            }
+        };
+        return visit;
     }
     /**
      * 同步子节点列表：删除不在 SceneTree 中的子节点，递归处理每个子节点

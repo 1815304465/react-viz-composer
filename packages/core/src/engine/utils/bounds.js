@@ -1,5 +1,7 @@
 import { IDENTITY_MAT3 } from './constants/matrix';
 import { isDescendantOf } from './elements';
+import { getPathBounds } from './pathBounds';
+import { estimatePointsBounds } from './points';
 /**
  * 计算单个 drawable 元素（rect/ellipse/line/path/text/image）的局部包围盒
  * @param record 元素记录
@@ -36,8 +38,14 @@ function getElementBounds(record) {
             }
             return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
         }
-        case 'path':
-            return null;
+        case 'path': {
+            const d = record.data;
+            return getPathBounds(d.d);
+        }
+        case 'points': {
+            const d = record.data;
+            return estimatePointsBounds(d);
+        }
         case 'text': {
             const d = record.data;
             const lines = d.text.split('\n');
@@ -116,8 +124,19 @@ function estimateLocalBounds(node) {
             return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
         }
         case 'path': {
-            // Path 无法快速估算 bounds 而不解析 d 字符串；默认不裁剪 Path 节点
-            return null;
+            const pathD = d.d;
+            if (!pathD)
+                return null;
+            const pb = getPathBounds(pathD);
+            if (!pb)
+                return null;
+            return { x: pb.x, y: pb.y, w: pb.width, h: pb.height };
+        }
+        case 'points': {
+            const pb = estimatePointsBounds(node.data);
+            if (!pb)
+                return null;
+            return { x: pb.x, y: pb.y, w: pb.width, h: pb.height };
         }
         default:
             return null;

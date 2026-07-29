@@ -13,12 +13,13 @@ export { Line } from './shapes/geometries/Line';
 export { Path } from './shapes/geometries/Path';
 export { Text } from './shapes/geometries/Text';
 export { Image } from './shapes/geometries/Image';
+export { Points } from './shapes/geometries/Points';
 // 定义类组件
 export { LinearGradient } from './shapes/definitions/LinearGradient';
 export { RadialGradient } from './shapes/definitions/RadialGradient';
-export { ClipPath } from './shapes/definitions/ClipPath';
-export { Filter } from './shapes/definitions/Filter';
-export { Mask } from './shapes/definitions/Mask';
+export { ClipPath } from './shapes/containers/ClipPath';
+export { Filter } from './shapes/containers/Filter';
+export { Mask } from './shapes/containers/Mask';
 // 容器组件
 export { Group } from './shapes/containers/Group';
 export { Animation } from './shapes/containers/Animation';
@@ -27,4 +28,4 @@ export { VizEvent } from './engine/types';
 export { Model, Graph, SceneTree, EventSystem } from './engine';
 export { CanvasRenderer, SVGRenderer, Renderer } from './engine';
 // Context hooks
-export { useViz, useVizFrame, useParentId, useSceneTree, useRegisterNode, useAnimAttrs, applyAnimAttrs, } from './context';
+export { useViz, useVizFrame, useParentId, useSceneTree, } from './context';

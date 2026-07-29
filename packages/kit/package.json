@@ -1,0 +1,60 @@
+{
+  "name": "@react-viz-composer/kit",
+  "version": "0.1.0",
+  "description": "Semi-finished chart building blocks — Axis, Grid, Tooltip, Legend, Marks, Crosshair, Brush (display-only; wire data & events yourself)",
+  "license": "MIT",
+  "author": "tycho",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1815304465/react-viz-composer"
+  },
+  "homepage": "https://github.com/1815304465/react-viz-composer#readme",
+  "bugs": {
+    "url": "https://github.com/1815304465/react-viz-composer/issues"
+  },
+  "keywords": [
+    "react",
+    "visualization",
+    "chart",
+    "svg",
+    "canvas",
+    "dataviz",
+    "chart-kit"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "dev": "vite build --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "@react-viz-composer/core": "*"
+  },
+  "devDependencies": {
+    "@react-viz-composer/core": "*",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "@vitejs/plugin-react": "^6.0.3"
+  }
+}

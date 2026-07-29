@@ -1,7 +1,9 @@
 import type { Mat3 } from './constants/matrix';
 import { IDENTITY_MAT3 } from './constants/matrix';
-import type { ElementRecord, RectData, EllipseData, LineData, TextData, ImageData } from '../types';
+import type { ElementRecord, RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData } from '../types';
 import { isDescendantOf } from './elements';
+import { getPathBounds } from './pathBounds';
+import { estimatePointsBounds } from './points';
 
 /** 元素轴对齐包围盒 */
 interface ElementBounds {
@@ -46,8 +48,14 @@ function getElementBounds(record: ElementRecord): ElementBounds | null {
       }
       return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     }
-    case 'path':
-      return null;
+    case 'path': {
+      const d = record.data as PathData;
+      return getPathBounds(d.d);
+    }
+    case 'points': {
+      const d = record.data as PointsData;
+      return estimatePointsBounds(d);
+    }
     case 'text': {
       const d = record.data as TextData;
       const lines = d.text.split('\n');
@@ -119,8 +127,16 @@ function estimateLocalBounds(node: ElementRecord): { x: number; y: number; w: nu
       return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
     }
     case 'path': {
-      // Path 无法快速估算 bounds 而不解析 d 字符串；默认不裁剪 Path 节点
-      return null;
+      const pathD = d.d as string;
+      if (!pathD) return null;
+      const pb = getPathBounds(pathD);
+      if (!pb) return null;
+      return { x: pb.x, y: pb.y, w: pb.width, h: pb.height };
+    }
+    case 'points': {
+      const pb = estimatePointsBounds(node.data as PointsData);
+      if (!pb) return null;
+      return { x: pb.x, y: pb.y, w: pb.width, h: pb.height };
     }
     default:
       return null;

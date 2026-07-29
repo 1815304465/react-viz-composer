@@ -1,5 +1,5 @@
 import { Renderer } from './Renderer';
-import { getEffectiveOpacity, isElementVisible, transformToMatrix, multiplyMat3, estimateLocalBounds, boundsIntersectViewport, IDENTITY_MAT3, } from '../index';
+import { getEffectiveOpacity, isElementVisible, transformToMatrix, multiplyMat3, estimateLocalBounds, boundsIntersectViewport, IDENTITY_MAT3, sortByPaintOrder, pointAttr, getPointsCount, reorderSvgDomPaintOrder, } from '../index';
 /** SVG 命名空间 URI */
 const NS = 'http://www.w3.org/2000/svg';
 /**
@@ -21,8 +21,12 @@ class SVGRenderer extends Renderer {
     viewportGroup;
     /** 节点 id → SVG DOM 元素的映射 */
     elementMap = new Map();
-    /** group/animation 节点 id → 对应 <g> 元素的映射（用于挂载子节点） */
+    /** group/animation/clipPath/filter/mask 节点 id → 对应 <g> 元素的映射（用于挂载子节点） */
     groupContainerMap = new Map();
+    /** 效果容器的 defs 定义元素（id → clipPath/filter/mask def） */
+    effectDefMap = new Map();
+    /** points 节点 id → 子 ellipse 元素列表 */
+    pointsChildMap = new Map();
     /** 当前画布宽度 */
     viewWidth = 0;
     /** 当前画布高度 */
@@ -169,9 +173,32 @@ class SVGRenderer extends Renderer {
      */
     render(roots) {
         const visible = this.getVisibleBounds();
-        for (const root of roots) {
-            this.renderNode(root, IDENTITY_MAT3, visible);
+        const sortedRoots = sortByPaintOrder(roots.filter((r) => !r.removed));
+        for (const root of sortedRoots) {
+            const parentMatrix = root.parent
+                ? this.computeWorldMatrix(root.parent)
+                : IDENTITY_MAT3;
+            this.renderNode(root, parentMatrix, visible);
         }
+        const allTopLevel = sortedRoots.every((r) => !r.parentId);
+        if (allTopLevel && sortedRoots.length > 1) {
+            reorderSvgDomPaintOrder(this.viewportGroup, this.elementMap, sortedRoots);
+        }
+    }
+    /**
+     * 递归计算并缓存节点世界矩阵（增量渲染脏子树时，需先确保祖先矩阵正确）
+     * @param node 目标节点
+     */
+    computeWorldMatrix(node) {
+        if (!node.worldMatrixDirty)
+            return node.worldMatrix;
+        const parentMatrix = node.parent
+            ? this.computeWorldMatrix(node.parent)
+            : IDENTITY_MAT3;
+        const localMatrix = transformToMatrix(node.data.transform);
+        multiplyMat3(node.worldMatrix, parentMatrix, localMatrix);
+        node.worldMatrixDirty = false;
+        return node.worldMatrix;
     }
     /**
      * 递归渲染一个节点（覆盖基类）
@@ -233,9 +260,19 @@ class SVGRenderer extends Renderer {
                 }
             }
         }
-        // 3. 递归 children
-        for (const child of node.children) {
+        // 3. 递归 children（按 zIndex 排序）
+        const sortedChildren = sortByPaintOrder(node.children.filter((c) => !c.removed));
+        for (const child of sortedChildren) {
             this.renderNode(child, node.worldMatrix, visible);
+        }
+        if (sortedChildren.length > 1) {
+            const container = node.type === 'group' || node.type === 'animation'
+                || node.type === 'clipPath' || node.type === 'filter' || node.type === 'mask'
+                ? this.groupContainerMap.get(node.id)
+                : null;
+            if (container) {
+                reorderSvgDomPaintOrder(container, this.elementMap, sortedChildren);
+            }
         }
         // 4. 清脏
         if (node.dirty) {
@@ -249,7 +286,8 @@ class SVGRenderer extends Renderer {
      * 支持的节点类型：
      * - rect/ellipse/line/path/text/image → 对应 SVG 元素
      * - group/animation → <g> 容器
-     * - linearGradient/radialGradient/clipPath/filter/mask → 挂在 <defs> 内
+     * - clipPath/filter/mask → <g> + defs 内定义
+     * - linearGradient/radialGradient → 挂在 <defs> 内
      * @param record 元素记录
      */
     createNodeDom(record) {
@@ -279,6 +317,9 @@ class SVGRenderer extends Renderer {
                 el = document.createElementNS(NS, 'image');
                 this.applyImageAttrs(el, record.data, record);
                 break;
+            case 'points':
+                el = this.createPointsEl(record);
+                break;
             case 'group':
                 el = this.createGroupEl(record);
                 break;
@@ -289,13 +330,13 @@ class SVGRenderer extends Renderer {
                 el = this.createRadialGradient(record);
                 break;
             case 'clipPath':
-                el = this.createClipPathEl(record);
+                el = this.createEffectContainer(record, 'clip-path');
                 break;
             case 'filter':
-                el = this.createFilterEl(record);
+                el = this.createEffectContainer(record, 'filter');
                 break;
             case 'mask':
-                el = this.createMaskEl(record);
+                el = this.createEffectContainer(record, 'mask');
                 break;
             case 'animation':
                 // animation 容器：当作 group 处理（绘制子节点，不绘制自身）
@@ -310,14 +351,86 @@ class SVGRenderer extends Renderer {
             parentContainer.appendChild(el);
         }
         this.elementMap.set(record.id, el);
-        if (record.type === 'group' || record.type === 'animation') {
+        if (record.type === 'group' || record.type === 'animation'
+            || record.type === 'clipPath' || record.type === 'filter' || record.type === 'mask') {
             this.groupContainerMap.set(record.id, el);
         }
         // 注册到事件系统（用于命中检测）
         if (record.type !== 'linearGradient' && record.type !== 'radialGradient' && record.type !== 'clipPath' &&
-            record.type !== 'filter' && record.type !== 'mask') {
+            record.type !== 'filter' && record.type !== 'mask' && record.type !== 'points') {
             this.eventSystem?.registerSVGElement(record.id, el);
         }
+    }
+    /**
+     * 创建效果容器：defs 中放定义，返回带 clip-path/filter/mask 引用的 <g>
+     * @param record 节点
+     * @param attrName SVG 属性名
+     */
+    createEffectContainer(record, attrName) {
+        const defId = `${record.id}-def`;
+        let defEl;
+        if (record.type === 'clipPath') {
+            defEl = this.createClipPathEl(record, defId);
+        }
+        else if (record.type === 'filter') {
+            defEl = this.createFilterEl(record, defId);
+        }
+        else {
+            defEl = this.createMaskEl(record, defId);
+        }
+        this.defs.appendChild(defEl);
+        this.effectDefMap.set(record.id, defEl);
+        const g = document.createElementNS(NS, 'g');
+        g.setAttribute(attrName, `url(#${defId})`);
+        this.applyGroupTransform(g, record.data);
+        this.applyCommonAttrs(g, record);
+        return g;
+    }
+    /**
+     * 创建批量圆点的 <g> 容器及子 ellipse
+     * @param record 元素记录
+     */
+    createPointsEl(record) {
+        const g = document.createElementNS(NS, 'g');
+        g.setAttribute('data-viz-id', record.id);
+        this.syncPointsChildren(g, record);
+        this.pointsChildMap.set(record.id, Array.from(g.querySelectorAll('ellipse')));
+        this.eventSystem?.registerSVGElement(record.id, g);
+        return g;
+    }
+    /**
+     * 同步批量圆点 DOM 子节点数量与属性
+     * @param container 容器 g 元素
+     * @param record 元素记录
+     */
+    syncPointsChildren(container, record) {
+        const data = record.data;
+        const n = getPointsCount(data);
+        const existing = container.querySelectorAll('ellipse');
+        const defaultRx = pointAttr(data.rx, 0, 4);
+        const defaultRy = pointAttr(data.ry, 0, defaultRx);
+        for (let i = 0; i < n; i++) {
+            let el = existing[i];
+            if (!el) {
+                el = document.createElementNS(NS, 'ellipse');
+                container.appendChild(el);
+            }
+            el.setAttribute('cx', String(data.cx[i]));
+            el.setAttribute('cy', String(data.cy[i]));
+            el.setAttribute('rx', String(pointAttr(data.rx, i, defaultRx)));
+            el.setAttribute('ry', String(pointAttr(data.ry, i, defaultRy)));
+            const fill = pointAttr(data.fill, i, '#000');
+            const stroke = pointAttr(data.stroke, i, 'none');
+            el.setAttribute('fill', fill);
+            el.setAttribute('stroke', stroke);
+            el.setAttribute('stroke-width', String(pointAttr(data.strokeWidth, i, 1)));
+            el.setAttribute('data-viz-id', `${record.id}#${i}`);
+            this.eventSystem?.registerSVGElement(`${record.id}#${i}`, el);
+        }
+        for (let i = existing.length - 1; i >= n; i--) {
+            existing[i].remove();
+        }
+        this.applyCommonAttrs(container, record);
     }
     /**
      * 增量更新已有 DOM（不销毁重建）
@@ -352,10 +465,17 @@ class SVGRenderer extends Renderer {
             case 'image':
                 this.applyImageAttrs(el, data, record);
                 break;
+            case 'points':
+                this.syncPointsChildren(el, record);
+                break;
             case 'group':
             case 'animation':
+            case 'clipPath':
+            case 'filter':
+            case 'mask':
                 this.applyGroupTransform(el, data);
                 this.applyCommonAttrs(el, record);
+                this.updateEffectDef(record);
                 break;
             case 'linearGradient':
                 this.updateLinearGradient(el, data);
@@ -363,45 +483,53 @@ class SVGRenderer extends Renderer {
             case 'radialGradient':
                 this.updateRadialGradient(el, data);
                 break;
-            case 'clipPath':
-                this.updateClipPathEl(el, data);
-                break;
-            case 'filter':
-                this.updateFilterEl(el, data);
-                break;
-            case 'mask':
-                this.updateMaskEl(el, data);
-                break;
+        }
+    }
+    /**
+     * 更新效果容器在 defs 中的定义
+     * @param record 节点
+     */
+    updateEffectDef(record) {
+        const defEl = this.effectDefMap.get(record.id);
+        if (!defEl)
+            return;
+        const defId = `${record.id}-def`;
+        if (record.type === 'clipPath') {
+            this.updateClipPathEl(defEl, record.data, defId);
+        }
+        else if (record.type === 'filter') {
+            this.updateFilterEl(defEl, record.data, defId);
+        }
+        else if (record.type === 'mask') {
+            this.updateMaskEl(defEl, record.data, defId);
         }
     }
     /**
      * 决定节点挂到哪个父容器
-     * - 渐变/clipPath/filter/mask → defs
-     * - group/animation 内部节点 → 对应 groupContainerMap 中的 <g>
+     * - 渐变 → defs
+     * - group/animation/clipPath/filter/mask 内部节点 → 对应 groupContainerMap 中的 <g>
      * - 顶层 drawable → viewportGroup
      * @param record 元素记录
      * @returns 父容器 SVG 元素
      */
     resolveParentContainer(record) {
-        if (record.type === 'linearGradient' || record.type === 'radialGradient' || record.type === 'clipPath' ||
-            record.type === 'filter' || record.type === 'mask') {
+        if (record.type === 'linearGradient' || record.type === 'radialGradient') {
             return this.defs;
         }
         const parent = record.parent;
         if (!parent)
             return this.viewportGroup;
-        if (parent.type === 'group' || parent.type === 'animation') {
+        if (parent.type === 'group' || parent.type === 'animation'
+            || parent.type === 'clipPath' || parent.type === 'filter' || parent.type === 'mask') {
             return this.groupContainerMap.get(parent.id) ?? this.viewportGroup;
         }
         return this.viewportGroup;
     }
-    /** 创建 group 容器 <g> 元素并设置 filter/mask/transform/通用属性 */
+    /** 创建 group 容器 <g> 元素并设置 transform/通用属性 */
     createGroupEl(record) {
         const g = document.createElementNS(NS, 'g');
         const data = record.data;
         this.applyGroupTransform(g, data);
-        this.setFilterAttr(g, data.filter);
-        this.setMaskAttr(g, data.mask);
         this.applyCommonAttrs(g, record);
         return g;
     }
@@ -432,6 +560,11 @@ class SVGRenderer extends Renderer {
                 this.elementMap.delete(id);
                 this.groupContainerMap.delete(id);
             }
+            const defEl = this.effectDefMap.get(id);
+            if (defEl) {
+                defEl.remove();
+                this.effectDefMap.delete(id);
+            }
             this.eventSystem?.unregisterSVGElement(id);
         }
     }
@@ -446,6 +579,7 @@ class SVGRenderer extends Renderer {
         this.svg.appendChild(this.viewportGroup);
         this.elementMap.clear();
         this.groupContainerMap.clear();
+        this.effectDefMap.clear();
     }
     /** 销毁渲染器：停止拖拽、清空 DOM、移除 SVG 元素 */
     dispose() {
@@ -483,9 +617,6 @@ class SVGRenderer extends Renderer {
             el.setAttribute('ry', String(data.ry));
         else
             el.removeAttribute('ry');
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setPaintAttrs(el, data);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
@@ -502,9 +633,6 @@ class SVGRenderer extends Renderer {
         el.setAttribute('cy', String(data.cy));
         el.setAttribute('rx', String(data.rx));
         el.setAttribute('ry', String(data.ry));
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setPaintAttrs(el, data);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
@@ -523,9 +651,6 @@ class SVGRenderer extends Renderer {
             el.setAttribute('stroke', data.stroke);
         if (data.strokeWidth !== undefined)
             el.setAttribute('stroke-width', String(data.strokeWidth));
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setPaintAttrs(el, data);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
@@ -540,9 +665,6 @@ class SVGRenderer extends Renderer {
     applyPathAttrs(el, data, record) {
         el.setAttribute('d', data.d);
         this.setPaintAttrs(el, data);
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
     }
@@ -573,9 +695,6 @@ class SVGRenderer extends Renderer {
         if (data.strokeWidth !== undefined)
             el.setAttribute('stroke-width', String(data.strokeWidth));
         el.textContent = data.text;
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
     }
@@ -594,9 +713,6 @@ class SVGRenderer extends Renderer {
         el.setAttribute('href', data.src);
         if (data.preserveAspectRatio)
             el.setAttribute('preserveAspectRatio', data.preserveAspectRatio);
-        this.setClipPathAttr(el, data.clipPath);
-        this.setFilterAttr(el, data.filter);
-        this.setMaskAttr(el, data.mask);
         this.setTransform(el, data.transform);
         this.applyCommonAttrs(el, record);
     }
@@ -677,16 +793,16 @@ class SVGRenderer extends Renderer {
     }
     // ---- ClipPath ----
     /** 创建 <clipPath> 元素（挂在 defs 中），内部填充对应的形状子元素 */
-    createClipPathEl(record) {
+    createClipPathEl(record, defId) {
         const data = record.data;
         const el = document.createElementNS(NS, 'clipPath');
-        el.setAttribute('id', data.id);
+        el.setAttribute('id', defId);
         this.fillClipPathChildren(el, data);
         return el;
     }
     /** 更新 <clipPath>：重新生成子元素 */
-    updateClipPathEl(el, data) {
-        el.setAttribute('id', data.id);
+    updateClipPathEl(el, data, defId) {
+        el.setAttribute('id', defId);
         while (el.firstChild)
             el.removeChild(el.firstChild);
         this.fillClipPathChildren(el, data);
@@ -774,38 +890,17 @@ class SVGRenderer extends Renderer {
         else
             el.removeAttribute('pointer-events');
     }
-    /** 设置 clip-path 属性（url(#id) 引用或移除） */
-    setClipPathAttr(el, clipPath) {
-        if (clipPath)
-            el.setAttribute('clip-path', clipPath);
-        else
-            el.removeAttribute('clip-path');
-    }
-    /** 设置 filter 属性（url(#id) 引用或移除） */
-    setFilterAttr(el, filterRef) {
-        if (filterRef)
-            el.setAttribute('filter', filterRef);
-        else
-            el.removeAttribute('filter');
-    }
-    /** 设置 mask 属性（url(#id) 引用或移除） */
-    setMaskAttr(el, maskRef) {
-        if (maskRef)
-            el.setAttribute('mask', maskRef);
-        else
-            el.removeAttribute('mask');
-    }
     // ---- Filter ----
     /** 创建 <filter> 元素（挂在 defs 中），内部构建 feXxx 滤镜链 */
-    createFilterEl(record) {
+    createFilterEl(record, defId) {
         const data = record.data;
         const el = document.createElementNS(NS, 'filter');
-        this.applyFilterAttrs(el, data);
+        this.applyFilterAttrs(el, data, defId);
         return el;
     }
     /** 更新 <filter>：重新构建滤镜链 */
-    updateFilterEl(el, data) {
-        this.applyFilterAttrs(el, data);
+    updateFilterEl(el, data, defId) {
+        this.applyFilterAttrs(el, data, defId);
     }
     /**
      * 构建 feXxx 滤镜链
@@ -822,8 +917,8 @@ class SVGRenderer extends Renderer {
      * @param el SVGFilterElement
      * @param data 滤镜数据
      */
-    applyFilterAttrs(el, data) {
-        el.setAttribute('id', data.id);
+    applyFilterAttrs(el, data, defId) {
+        el.setAttribute('id', defId);
         // 默认 filterUnits 为 userSpaceOnUse（和 Canvas 行为一致）
         el.setAttribute('filterUnits', 'userSpaceOnUse');
         el.setAttribute('x', '-50%');
@@ -925,15 +1020,15 @@ class SVGRenderer extends Renderer {
     }
     // ---- Mask ----
     /** 创建 <mask> 元素（挂在 defs 中） */
-    createMaskEl(record) {
+    createMaskEl(record, defId) {
         const data = record.data;
         const el = document.createElementNS(NS, 'mask');
-        this.applyMaskAttrs(el, data);
+        this.applyMaskAttrs(el, data, defId);
         return el;
     }
     /** 更新 <mask>：重新设置属性和子元素 */
-    updateMaskEl(el, data) {
-        this.applyMaskAttrs(el, data);
+    updateMaskEl(el, data, defId) {
+        this.applyMaskAttrs(el, data, defId);
     }
     /**
      * 构建 mask 元素
@@ -946,8 +1041,8 @@ class SVGRenderer extends Renderer {
      * @param el SVGMaskElement
      * @param data 遮罩数据
      */
-    applyMaskAttrs(el, data) {
-        el.setAttribute('id', data.id);
+    applyMaskAttrs(el, data, defId) {
+        el.setAttribute('id', defId);
         // maskUnits 默认 userSpaceOnUse（和 Canvas 行为一致）
         el.setAttribute('maskUnits', 'userSpaceOnUse');
         if (data.maskMode === 'luminance') {

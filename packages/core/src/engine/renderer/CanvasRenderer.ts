@@ -1,6 +1,6 @@
 import type {
   ElementRecord, Transform,
-  RectData, EllipseData, LineData, PathData, TextData, ImageData,
+  RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData,
   LinearGradientData, RadialGradientData, ClipPathData,
   FilterData, FilterEffect, MaskData,
   VizDragEventHandler,
@@ -13,9 +13,23 @@ import {
   parseDashArray, computeImageDrawRect,
   transformToMatrix, multiplyMat3,
   estimateLocalBounds, boundsIntersectViewport,
-  IDENTITY_MAT3,
+  IDENTITY_MAT3, sortByPaintOrder,
+  pointAttr, getPointsCount,
 } from '../index';
 import type { Mat3 } from '../types';
+
+/** 容器级效果帧：begin/end 成对传递，支持嵌套 */
+type ContainerEffectFrame =
+  | { kind: 'clip' }
+  | { kind: 'filter'; prevFilter: string }
+  | {
+      kind: 'mask';
+      maskCtx: CanvasRenderingContext2D;
+      origCtx: CanvasRenderingContext2D;
+      savedCtx: CanvasRenderingContext2D;
+      offscreen: HTMLCanvasElement;
+      maskData: MaskData;
+    };
 
 /**
  * CanvasRenderer —— 基于 Canvas 2D 的渲染器（递归版）
@@ -24,7 +38,7 @@ import type { Mat3 } from '../types';
  * - 递归 renderNodeWithCollect：合成 worldMatrix 后 save/restore 应用变换
  * - 全画布重画策略：每次 render 先 clearRect 清空，再递归绘制所有 top-level 节点
  * - viewport 通过 setTransform 直接设置（DPR × scale + translate），作为根矩阵
- * - 支持 clip-path / filter / mask 效果
+ * - 支持 clip-path / filter / mask 效果（容器效果可嵌套）
  * - 支持拖拽交互
  */
 class CanvasRenderer extends Renderer {
@@ -38,16 +52,11 @@ class CanvasRenderer extends Renderer {
   private linearGradientDefs = new Map<string, LinearGradientData>();
   /** 径向渐变定义缓存：id → RadialGradientData */
   private radialGradientDefs = new Map<string, RadialGradientData>();
-  /** 裁剪路径缓存：id → ClipPathData */
-  private clipPathCache: Map<string, ClipPathData> = new Map();
-  /** 滤镜缓存：id → FilterData */
-  private filterCache: Map<string, FilterData> = new Map();
-  /** 遮罩缓存：id → MaskData */
-  private maskCache: Map<string, MaskData> = new Map();
-  /** 遮罩离屏 Canvas（按需创建，viewWidth/viewHeight 变化时重建） */
-  private maskOffscreen: HTMLCanvasElement | null = null;
-  /** 遮罩离屏 Canvas 的 2D 上下文 */
-  private maskOffscreenCtx: CanvasRenderingContext2D | null = null;
+  /**
+   * Mask 离屏画布池（按嵌套深度复用，避免单例互相清空）
+   * 每次 beginMask acquire，endMask 后 release
+   */
+  private maskCanvasPool: HTMLCanvasElement[] = [];
   /** 当前画布逻辑宽度（CSS 像素） */
   protected viewWidth = 0;
   /** 当前画布逻辑高度（CSS 像素） */
@@ -215,7 +224,7 @@ class CanvasRenderer extends Renderer {
       this.renderNodeWithCollect(root, IDENTITY_MAT3 as Mat3, active, visible);
     }
 
-    this.eventSystem?.syncCanvasElements(active);
+    this.eventSystem?.syncCanvasElements(active, visible);
   }
 
   /**
@@ -251,10 +260,36 @@ class CanvasRenderer extends Renderer {
     multiplyMat3(node.worldMatrix, parentMatrix, localMatrix);
     node.worldMatrixDirty = false;
 
-    // 视口裁剪：仅对叶子 drawable 节点检查
-    const isLeaf = node.type !== 'group' && node.type !== 'animation' &&
-      node.type !== 'linearGradient' && node.type !== 'radialGradient' && node.type !== 'clipPath' &&
-      node.type !== 'filter' && node.type !== 'mask';
+    const isEffectContainer =
+      node.type === 'clipPath' || node.type === 'filter' || node.type === 'mask';
+    const isStructureContainer =
+      node.type === 'group' || node.type === 'animation' || isEffectContainer;
+    const isLeaf = !isStructureContainer
+      && node.type !== 'linearGradient' && node.type !== 'radialGradient';
+
+    // 效果容器：在子树绘制期间保持 clip / filter / mask（帧对象可重入嵌套）
+    if (isEffectContainer) {
+      this.ctx.save();
+      this.applyMat3(this.ctx, node.worldMatrix);
+      const effectFrame = this.beginContainerEffect(node);
+      // 矩阵已体现在 clip 区域；重置变换后由子节点各自 apply worldMatrix
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      const sortedChildren = sortByPaintOrder(node.children.filter((c) => !c.removed));
+      for (const child of sortedChildren) {
+        this.renderNodeWithCollect(child, node.worldMatrix, active, visible);
+      }
+
+      this.endContainerEffect(effectFrame);
+      this.ctx.restore();
+
+      if (node.dirty) {
+        node.dirty = false;
+        node.subtreeDirty = false;
+      }
+      return;
+    }
+
     let culled = false;
     if (visible && isLeaf) {
       const lbs = estimateLocalBounds(node);
@@ -272,15 +307,16 @@ class CanvasRenderer extends Renderer {
       this.drawSelfInner(node);
 
       this.ctx.restore();
+
+      // 收集 drawable 给事件系统（视口外节点不参与命中）
+      if (isLeaf) {
+        active.push(node);
+      }
     }
 
-    // 收集 drawable 给事件系统（裁剪的节点也要收集，保持事件命中正确）
-    if (isLeaf) {
-      active.push(node);
-    }
-
-    // 递归 children
-    for (const child of node.children) {
+    // 递归 children（按 zIndex 排序）
+    const sortedChildren = sortByPaintOrder(node.children.filter((c) => !c.removed));
+    for (const child of sortedChildren) {
       this.renderNodeWithCollect(child, node.worldMatrix, active, visible);
     }
 
@@ -291,96 +327,90 @@ class CanvasRenderer extends Renderer {
     }
   }
 
+  /**
+   * 开始容器级 clip / filter / mask（在当前矩阵坐标系下）
+   * 返回帧对象供 end 成对恢复，支持任意嵌套深度
+   * @param node 容器节点
+   */
+  private beginContainerEffect(node: ElementRecord): ContainerEffectFrame | null {
+    if (node.type === 'clipPath') {
+      this.applyClipShape(node.data as ClipPathData);
+      return { kind: 'clip' };
+    }
+    if (node.type === 'filter') {
+      const prevFilter = this.ctx.filter;
+      this.ctx.filter = this.buildCssFilter((node.data as FilterData).effects);
+      return { kind: 'filter', prevFilter };
+    }
+    if (node.type === 'mask') {
+      const maskData = node.data as MaskData;
+      const result = this.beginMask();
+      if (!result) return null;
+      const savedCtx = this.ctx;
+      this.ctx = result.maskCtx;
+      return {
+        kind: 'mask',
+        maskCtx: result.maskCtx,
+        origCtx: result.origCtx,
+        savedCtx,
+        offscreen: result.offscreen,
+        maskData,
+      };
+    }
+    return null;
+  }
+
+  /**
+   * 结束容器级效果（与 beginContainerEffect 成对）
+   * @param frame begin 返回的帧
+   */
+  private endContainerEffect(frame: ContainerEffectFrame | null): void {
+    if (!frame) return;
+    if (frame.kind === 'filter') {
+      this.ctx.filter = frame.prevFilter;
+      return;
+    }
+    if (frame.kind === 'mask') {
+      this.ctx = frame.savedCtx;
+      this.endMask(frame.origCtx, frame.maskData, frame.offscreen);
+    }
+  }
+
   /** 基类要求的 drawSelf：直接委托给内部实现 */
   protected drawSelf(node: ElementRecord): void {
     this.drawSelfInner(node);
   }
 
   /**
-   * 统一绘制入口：处理 opacity/clip/filter/mask 后分发到具体形状绘制
-   *
-   * 管线顺序：
-   * 1. 应用 opacity（globalAlpha）
-   * 2. 应用 clip-path（ctx.clip）
-   * 3. 应用 filter（ctx.filter）
-   * 4. 应用 mask（切换到离屏 Canvas 绘制）
-   * 5. switch 分发到 drawRect/drawEllipse/drawLine/drawPath/drawText/drawImage
-   * 6. 如果有 mask，调用 endMask 合成
-   * 7. 恢复 filter/clip/opacity
+   * 统一绘制入口：opacity → 形状绘制
+   * clip / filter / mask 由外层效果容器负责，叶子节点不再解析 url(#id)
    * @param record 元素记录
    */
   private drawSelfInner(record: ElementRecord): void {
-    const data = record.data as { transform?: Transform; clipPath?: string; filter?: string; mask?: string };
     const opacity = this.model ? getEffectiveOpacity(this.model, record) : 1;
     const opacitySaved = pushCanvasOpacity(this.ctx, opacity);
 
-    // 应用 clip-path
-    const clipPath = data.clipPath;
-    let clipSaved = false;
-    if (clipPath) {
-      const clipId = this.extractUrlId(clipPath);
-      if (clipId) {
-        const clipDef = this.clipPathCache.get(clipId);
-        if (clipDef) {
-          this.ctx.save();
-          clipSaved = true;
-          this.applyClipShape(clipDef);
-        }
-      }
-    }
-
-    // 应用 filter
-    let filterSaved = false;
-    let prevFilter = '';
-    if (data.filter) {
-      const filterId = this.extractUrlId(data.filter);
-      if (filterId) {
-        const filterDef = this.filterCache.get(filterId);
-        if (filterDef) {
-          prevFilter = this.ctx.filter;
-          this.ctx.filter = this.buildCssFilter(filterDef.effects);
-          filterSaved = true;
-        }
-      }
-    }
-
-    // 应用 mask
-    let maskCtx: CanvasRenderingContext2D | null = null;
-    let maskOrigCtx: CanvasRenderingContext2D | null = null;
-    if (data.mask) {
-      const maskId = this.extractUrlId(data.mask);
-      if (maskId) {
-        const maskDef = this.maskCache.get(maskId);
-        if (maskDef) {
-          const result = this.beginMask(maskDef, record);
-          if (result) {
-            maskCtx = result.maskCtx;
-            maskOrigCtx = result.origCtx;
-          }
-        }
-      }
-    }
-
-    const drawCtx = maskCtx ?? this.ctx;
-
     switch (record.type) {
       case 'rect':
-        this.drawRect(drawCtx, record.data as RectData);
+        this.drawRect(this.ctx, record.data as RectData);
         break;
       case 'ellipse':
-        this.drawEllipse(drawCtx, record.data as EllipseData);
+        this.drawEllipse(this.ctx, record.data as EllipseData);
         break;
       case 'line':
-        this.drawLine(drawCtx, record.data as LineData);
+        this.drawLine(this.ctx, record.data as LineData);
         break;
       case 'path':
-        this.drawPath(drawCtx, record.data as PathData);
+        this.drawPath(this.ctx, record.data as PathData);
         break;
       case 'text':
-        this.drawText(drawCtx, record.data as TextData);
+        this.drawText(this.ctx, record.data as TextData);
         break;
       case 'image':
-        this.drawImage(drawCtx, record.data as ImageData);
+        this.drawImage(this.ctx, record.data as ImageData);
+        break;
+      case 'points':
+        this.drawPoints(this.ctx, record.data as PointsData);
         break;
       case 'linearGradient':
         this.cacheLinearGradient(record.data as LinearGradientData);
@@ -389,24 +419,13 @@ class CanvasRenderer extends Renderer {
         this.cacheRadialGradient(record.data as RadialGradientData);
         break;
       case 'clipPath':
-        this.cacheClipPath(record.data as ClipPathData);
-        break;
       case 'filter':
-        this.cacheFilter(record.data as FilterData);
-        break;
       case 'mask':
-        this.cacheMask(record.data as MaskData);
-        break;
       case 'group':
       case 'animation':
         break;
     }
 
-    if (maskCtx && maskOrigCtx) {
-      this.endMask(maskCtx, maskOrigCtx, data.mask!);
-    }
-    if (filterSaved) this.ctx.filter = prevFilter;
-    if (clipSaved) this.ctx.restore();
     popCanvasOpacity(this.ctx, opacitySaved);
   }
 
@@ -442,8 +461,7 @@ class CanvasRenderer extends Renderer {
     this.ctx.clearRect(0, 0, width, height);
     this.linearGradientDefs.clear();
     this.radialGradientDefs.clear();
-    this.filterCache.clear();
-    this.maskCache.clear();
+    this.maskCanvasPool.length = 0;
   }
 
   /** 销毁渲染器：停止拖拽、移除 Canvas、清空所有缓存 */
@@ -453,11 +471,7 @@ class CanvasRenderer extends Renderer {
     this.imageCache.clear();
     this.linearGradientDefs.clear();
     this.radialGradientDefs.clear();
-    this.clipPathCache.clear();
-    this.filterCache.clear();
-    this.maskCache.clear();
-    this.maskOffscreen = null;
-    this.maskOffscreenCtx = null;
+    this.maskCanvasPool.length = 0;
   }
 
   /** 调整画布尺寸：按 DPR 设置物理像素，重置变换矩阵 */
@@ -516,6 +530,43 @@ class CanvasRenderer extends Renderer {
     if (data.fill && data.fill !== 'none' && data.fill !== 'transparent') ctx.fill();
     if (data.stroke && data.stroke !== 'none') ctx.stroke();
     this.resetStrokeExtras(ctx);
+  }
+
+  /**
+   * 绘制批量圆点
+   * @param ctx 2D 上下文
+   * @param data 批量圆点数据
+   */
+  private drawPoints(ctx: CanvasRenderingContext2D, data: PointsData): void {
+    const n = getPointsCount(data);
+    if (n === 0) return;
+
+    const defaultRx = pointAttr(data.rx, 0, 4);
+    const defaultRy = pointAttr(data.ry, 0, defaultRx);
+    const defaultFill = pointAttr(data.fill, 0, '#000');
+    const defaultStroke = pointAttr(data.stroke, 0, 'none');
+    const defaultStrokeWidth = pointAttr(data.strokeWidth, 0, 1);
+
+    for (let i = 0; i < n; i++) {
+      const cx = data.cx[i];
+      const cy = data.cy[i];
+      const rx = pointAttr(data.rx, i, defaultRx);
+      const ry = pointAttr(data.ry, i, defaultRy);
+      const fill = pointAttr(data.fill, i, defaultFill);
+      const stroke = pointAttr(data.stroke, i, defaultStroke);
+      const strokeWidth = pointAttr(data.strokeWidth, i, defaultStrokeWidth);
+      const bounds = { x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2 };
+
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fillStyle = this.resolveColor(fill, bounds);
+      if (fill && fill !== 'none' && fill !== 'transparent') ctx.fill();
+      if (stroke && stroke !== 'none') {
+        ctx.strokeStyle = this.resolveColor(stroke, bounds);
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
+    }
   }
 
   /**
@@ -756,10 +807,6 @@ class CanvasRenderer extends Renderer {
     this.radialGradientDefs.set(data.id, data);
   }
 
-  /** 缓存裁剪路径定义 */
-  private cacheClipPath(data: ClipPathData): void {
-    this.clipPathCache.set(data.id, data);
-  }
 
   /**
    * 根据 ClipPathData 创建 clipping path 并应用到当前上下文
@@ -790,17 +837,6 @@ class CanvasRenderer extends Renderer {
   }
 
   // ---- Filter ----
-
-  /** 缓存滤镜定义 */
-  private cacheFilter(data: FilterData): void {
-    this.filterCache.set(data.id, data);
-  }
-
-  /** 从 url(#id) 格式字符串中提取 id */
-  private extractUrlId(value: string): string | null {
-    const m = value.match(/^url\(#(.+)\)$/);
-    return m ? m[1] : null;
-  }
 
   /**
    * 将 FilterEffect[] 拼接为 CSS filter 字符串供 ctx.filter 使用
@@ -837,109 +873,92 @@ class CanvasRenderer extends Renderer {
 
   // ---- Mask ----
 
-  /** 缓存遮罩定义 */
-  private cacheMask(data: MaskData): void {
-    this.maskCache.set(data.id, data);
+
+  /**
+   * 从池中取一块与主画布同尺寸的离屏 Canvas
+   * @param width 物理像素宽
+   * @param height 物理像素高
+   */
+  private acquireMaskCanvas(width: number, height: number): HTMLCanvasElement {
+    const cached = this.maskCanvasPool.pop();
+    if (cached && cached.width === width && cached.height === height) return cached;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
   }
 
   /**
-   * 开始遮罩：创建离屏 Canvas 并将当前绘制上下文切换过去
-   * 后续 drawSelfInner 中的形状绘制会在离屏 Canvas 上进行
-   * @param maskDef 遮罩定义
-   * @param record 元素记录
-   * @returns { maskCtx, origCtx } 或 null（创建失败）
+   * 归还离屏 Canvas 到池
+   * @param canvas 离屏画布
    */
-  private beginMask(
-    maskDef: MaskData,
-    record: ElementRecord,
-  ): { maskCtx: CanvasRenderingContext2D; origCtx: CanvasRenderingContext2D } | null {
-    // 获取画布像素尺寸（含 DPR）
+  private releaseMaskCanvas(canvas: HTMLCanvasElement): void {
+    this.maskCanvasPool.push(canvas);
+  }
+
+  /**
+   * 开始遮罩：分配独立离屏 Canvas（可嵌套，互不共用）
+   * @returns 离屏上下文与画布，或 null
+   */
+  private beginMask(): {
+    maskCtx: CanvasRenderingContext2D;
+    origCtx: CanvasRenderingContext2D;
+    offscreen: HTMLCanvasElement;
+  } | null {
     const canvasW = this.canvas.width;
     const canvasH = this.canvas.height;
     if (canvasW <= 0 || canvasH <= 0) return null;
 
-    // 创建或复用离屏 Canvas
-    if (!this.maskOffscreen || this.maskOffscreen.width !== canvasW || this.maskOffscreen.height !== canvasH) {
-      this.maskOffscreen = document.createElement('canvas');
-      this.maskOffscreen.width = canvasW;
-      this.maskOffscreen.height = canvasH;
-      this.maskOffscreenCtx = this.maskOffscreen.getContext('2d');
+    const offscreen = this.acquireMaskCanvas(canvasW, canvasH);
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) {
+      this.releaseMaskCanvas(offscreen);
+      return null;
     }
 
-    const offCtx = this.maskOffscreenCtx!;
-
-    // 清空离屏 Canvas 并设置与主 ctx 相同的变换
     offCtx.setTransform(1, 0, 0, 1, 0, 0);
     offCtx.clearRect(0, 0, canvasW, canvasH);
+    offCtx.setTransform(this.ctx.getTransform());
 
-    // 复制主 ctx 的当前变换到离屏 ctx
-    const transform = this.ctx.getTransform();
-    offCtx.setTransform(transform);
-
-    return { maskCtx: offCtx, origCtx: this.ctx };
+    return { maskCtx: offCtx, origCtx: this.ctx, offscreen };
   }
 
   /**
-   * 结束遮罩：离屏 Canvas 实现 alpha 遮罩的合成
-   *
-   * 实现策略：
-   * 1. 创建一个新的离屏 Canvas 绘制 mask 形状（白色填充）
-   * 2. 用 source-in 合成模式将离屏内容裁剪到 mask 形状区域
-   * 3. 将合成结果 drawImage 回主 Canvas
-   *
-   * 注：Canvas 2D 没有原生 mask，使用 globalCompositeOperation
-   *     + 离屏 Canvas 模拟。alpha 模式通过 source-in 实现。
-   * @param maskCtx 遮罩上下文的 2D 绘制上下文（离屏 Canvas 上的内容）
-   * @param origCtx 原始主 Canvas 的 2D 上下文
-   * @param maskRef mask 引用字符串（url(#id) 格式）
+   * 结束遮罩：将本层离屏内容按 mask 形状合成回 origCtx，并归还画布
+   * @param origCtx 合成目标上下文（可能是主画布或外层 mask 离屏）
+   * @param maskData 遮罩定义
+   * @param offscreen 本层离屏画布
    */
   private endMask(
-    maskCtx: CanvasRenderingContext2D,
     origCtx: CanvasRenderingContext2D,
-    maskRef: string,
+    maskData: MaskData,
+    offscreen: HTMLCanvasElement,
   ): void {
-    if (!this.maskOffscreen) return;
+    const canvasW = offscreen.width;
+    const canvasH = offscreen.height;
 
-    const canvasW = this.maskOffscreen.width;
-    const canvasH = this.maskOffscreen.height;
-
-    // 创建 mask 形状的离屏 Canvas
     const maskShapeCanvas = document.createElement('canvas');
     maskShapeCanvas.width = canvasW;
     maskShapeCanvas.height = canvasH;
-    const maskShapeCtx = maskShapeCanvas.getContext('2d')!;
-
-    // 复制变换
-    const transform = origCtx.getTransform();
-    maskShapeCtx.setTransform(transform);
-
-    // 解析 mask 引用 id 并绘制 mask 形状
-    const maskId = this.extractUrlId(maskRef);
-    if (maskId) {
-      const maskDef = this.maskCache.get(maskId);
-      if (maskDef) {
-        this.drawMaskShape(maskShapeCtx, maskDef);
-      }
+    const maskShapeCtx = maskShapeCanvas.getContext('2d');
+    if (!maskShapeCtx) {
+      this.releaseMaskCanvas(offscreen);
+      return;
     }
 
-    // 使用 destination-in 实现 alpha mask：
-    // 先把主画面 target 内容画到主 canvas，然后用 mask 形状的 alpha 来控制可见性
-    // 这里用两步合成：
-    // 1. 用 source-in 把离屏内容合成到 mask 形状的区域
-    // 2. 把结果覆盖回主 ctx
+    maskShapeCtx.setTransform(origCtx.getTransform());
+    this.drawMaskShape(maskShapeCtx, maskData);
 
-    // 恢复 identity 变换进行合成
     maskShapeCtx.setTransform(1, 0, 0, 1, 0, 0);
-
-    // 把 mask 形状画到离屏内容上（source-in 保留 mask 形状内的部分）
     maskShapeCtx.globalCompositeOperation = 'source-in';
-    maskShapeCtx.drawImage(this.maskOffscreen, 0, 0);
+    maskShapeCtx.drawImage(offscreen, 0, 0);
 
-    // 把合成结果画回主 canvas
     origCtx.save();
     origCtx.setTransform(1, 0, 0, 1, 0, 0);
     origCtx.drawImage(maskShapeCanvas, 0, 0);
     origCtx.restore();
+
+    this.releaseMaskCanvas(offscreen);
   }
 
   /**

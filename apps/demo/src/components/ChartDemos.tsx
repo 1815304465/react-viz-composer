@@ -34,7 +34,7 @@ import {
   stepLineData, stepLineCategories,
   smoothLineData, smoothLineCategories,
   doughnutData, singleAxisScatterData, bidirectionalBarData,
-} from '@react-viz-composer/components';
+} from '@react-viz-composer/charts/mockData';
 import { forceLayout } from './forceLayout';
 
 /* ==================== 原有 Demo（不变） ==================== */

@@ -36,9 +36,6 @@ export interface RectData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 export interface EllipseData {
@@ -59,9 +56,6 @@ export interface EllipseData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 export interface LineData {
@@ -76,9 +70,6 @@ export interface LineData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 export interface PathData {
@@ -96,9 +87,6 @@ export interface PathData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 export interface TextData {
@@ -119,9 +107,6 @@ export interface TextData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 export interface ImageData {
@@ -136,9 +121,25 @@ export interface ImageData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
+}
+
+/**
+ * 批量圆点数据 —— 单节点渲染多个椭圆，适用于大规模散点
+ * cx/cy 等长数组；rx/ry/fill/stroke 可为标量或等长数组
+ */
+export interface PointsData {
+  cx: number[];
+  cy: number[];
+  rx?: number | number[];
+  ry?: number | number[];
+  fill?: string | string[];
+  stroke?: string | string[];
+  strokeWidth?: number | number[];
+  opacity?: number;
+  visible?: boolean;
+  pointerEvents?: 'auto' | 'none';
+  zIndex?: number;
+  transform?: Transform;
 }
 
 /* ---- 渐变 ---- */
@@ -171,16 +172,21 @@ export interface RadialGradientData {
   gradientUnits?: string;
 }
 
-/* ---- 裁剪 ---- */
+/* ---- 裁剪（容器节点：作用于子树） ---- */
 
 export interface ClipPathData {
-  id: string;
-  /** 子形状数据的 JSON 序列化快照，供渲染器创建裁剪路径 */
-  shapeType: ElementType;
-  shapeData: ElementData;
+  /** 裁剪形状类型 */
+  shapeType: 'rect' | 'ellipse' | 'path';
+  /** 裁剪形状数据 */
+  shapeData: RectData | EllipseData | PathData;
+  transform?: Transform;
+  opacity?: number;
+  visible?: boolean;
+  pointerEvents?: 'auto' | 'none';
+  zIndex?: number;
 }
 
-/* ---- 滤镜 ---- */
+/* ---- 滤镜（容器节点：作用于子树） ---- */
 
 /** 滤镜效果 —— 对标 Canvas 2D ctx.filter（CSS filter 字符串） */
 export interface FilterEffect {
@@ -195,23 +201,31 @@ export interface FilterEffect {
 }
 
 export interface FilterData {
-  id: string;
   effects: FilterEffect[];
+  transform?: Transform;
+  opacity?: number;
+  visible?: boolean;
+  pointerEvents?: 'auto' | 'none';
+  zIndex?: number;
 }
 
-/* ---- 遮罩 ---- */
+/* ---- 遮罩（容器节点：作用于子树） ---- */
 
 /** 遮罩模式 */
 export type MaskMode = 'alpha' | 'luminance';
 
 export interface MaskData {
-  id: string;
   /** 遮罩形状类型 */
   shapeType: 'rect' | 'ellipse' | 'path';
   /** 遮罩形状数据 */
   shapeData: RectData | EllipseData | PathData;
   /** 遮罩模式（alpha 使用形状透明度，luminance 使用亮度值），默认 'alpha' */
   maskMode?: MaskMode;
+  transform?: Transform;
+  opacity?: number;
+  visible?: boolean;
+  pointerEvents?: 'auto' | 'none';
+  zIndex?: number;
 }
 
 /** Group 数据（事件冒泡节点，可选样式属性） */
@@ -221,9 +235,6 @@ export interface GroupData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
-  clipPath?: string;
-  filter?: string;
-  mask?: string;
 }
 
 /** Animation 数据（动画容器节点） */
@@ -237,13 +248,13 @@ export interface AnimationData {
 
 export type ElementType =
   | 'rect' | 'ellipse' | 'line' | 'path'
-  | 'text' | 'image'
+  | 'text' | 'image' | 'points'
   | 'linearGradient' | 'radialGradient' | 'clipPath' | 'filter' | 'mask'
   | 'group' | 'animation';
 
 export type ElementData =
   | RectData | EllipseData | LineData | PathData
-  | TextData | ImageData
+  | TextData | ImageData | PointsData
   | LinearGradientData | RadialGradientData | ClipPathData
   | FilterData | MaskData
   | GroupData | AnimationData;
@@ -260,6 +271,8 @@ export type VizEventType =
  *
  * 类似 React 的 SyntheticEvent，包含原生事件引用和自定义冒泡控制。
  * 事件在容器上代理执行，不依赖浏览器原生冒泡。
+ *
+ * Points 命中时内部使用 `id#index`，对外拆成 `target`（元素 id）+ `pointIndex`。
  */
 export class VizEvent {
   readonly type: VizEventType;
@@ -268,10 +281,12 @@ export class VizEvent {
   readonly offsetX: number;
   readonly offsetY: number;
 
-  /** 事件最初触发的元素 id */
+  /** 事件最初触发的元素 id（Points 命中时不含 #index） */
   target: string;
   /** 当前冒泡阶段所在的元素 id */
   currentTarget: string;
+  /** Points 批量点索引；非 Points 命中时为 undefined */
+  readonly pointIndex?: number;
 
   private _propagationStopped = false;
   private _defaultPrevented = false;
@@ -285,8 +300,15 @@ export class VizEvent {
   ) {
     this.type = type;
     this.originalEvent = nativeEvent;
-    this.target = targetId;
-    this.currentTarget = targetId;
+    const hash = targetId.indexOf('#');
+    if (hash > 0) {
+      this.target = targetId.slice(0, hash);
+      const idx = Number.parseInt(targetId.slice(hash + 1), 10);
+      this.pointIndex = Number.isNaN(idx) ? undefined : idx;
+    } else {
+      this.target = targetId;
+    }
+    this.currentTarget = this.target;
     this.offsetX = offsetX;
     this.offsetY = offsetY;
   }
@@ -385,33 +407,99 @@ export interface GraphOptions {
 
 /* ---- Animation 类型 ---- */
 
-export type AnimEasing = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+/** 缓动名称（声明式 playbook 使用） */
+export type AnimEasing =
+  | 'linear'
+  | 'easeIn'
+  | 'easeOut'
+  | 'easeInOut'
+  | 'easeInCubic'
+  | 'easeOutCubic'
+  | 'easeInOutCubic'
+  | 'easeInBack'
+  | 'easeOutBack'
+  | 'easeInElastic'
+  | 'easeOutElastic';
 
-/** transform 动画属性（写入 AnimationContext，由渲染层递归合成到子节点 worldMatrix） */
+/** transform 动画属性（写入 group/animation 的 data.transform，由渲染层合成 worldMatrix） */
 export type AnimTransformAttribute = 'x' | 'y' | 'rotation' | 'scaleX' | 'scaleY';
 
 /**
- * 形状 data 动画属性（合并进 Rect/Ellipse/Path 等 data）
- * 注意：Path 的 d 字符串 morph 暂不支持
+ * 形状 data 动画属性（写入目标节点 data）
+ * 注意：Path 的 d 字符串 morph 请用 compute 自定义
  */
 export type AnimDataAttribute =
   | 'width' | 'height' | 'opacity'
   | 'rx' | 'ry' | 'cx' | 'cy'
   | 'strokeWidth' | 'fill' | 'stroke'
-  | 'fontSize';
+  | 'fontSize'
+  | 'text';
 
 export type AnimAttribute = AnimTransformAttribute | AnimDataAttribute;
 
-/** 单个动画步骤 */
+/**
+ * 动画作用目标
+ * - `'self'`：Animation 容器自身（transform 常用）
+ * - `'children'`：直接子节点（入场/交错常用）
+ * - `string` / `string[]`：指定节点 id
+ */
+/**
+ * 动画作用目标
+ * - `self`：Animation 容器自身
+ * - `children`：直接子节点；穿透 clipPath / filter / mask 取到真实形状
+ * - string / string[]：按元素 id 指定（与效果容器混用时推荐）
+ */
+export type AnimTarget = 'self' | 'children' | string | string[];
+
+/** compute 回调上下文（引擎每帧传入，不触发 React） */
+export interface AnimComputeContext {
+  /** 本轮循环内进度 0→1（sustain 时恒为 0） */
+  progress: number;
+  /** 相对本 track 起始的已过时间 ms */
+  elapsed: number;
+  /** 相对本 track 起始的秒数 */
+  time: number;
+  /** 目标在 targets 列表中的下标 */
+  index: number;
+  /** 目标节点 id */
+  targetId: string;
+  /** 全局时间戳 ms */
+  now: number;
+}
+
+/**
+ * 单个动画步骤（声明意图；from/to 可省略，播放时从 SceneTree 快照补齐）
+ *
+ * - 属性补间：提供 `attribute`，可选 `from` / `to`
+ * - 自定义：提供 `compute`（水波、呼吸等持续效果）
+ * - `sustain: true`：直到 cancel 为止每帧调用 compute
+ */
 export interface AnimStep {
-  attribute: AnimAttribute;
-  from: number | string;
-  to: number | string;
-  duration: number;
+  /** 要插值的属性；与 compute 二选一（可同时省略仅当 sustain+compute） */
+  attribute?: AnimAttribute;
+  /** 起始值；省略则取播放瞬间目标节点当前值 */
+  from?: number | string;
+  /** 结束值；省略则取播放瞬间目标节点当前值（入场：只写 from，to 来自子节点 props） */
+  to?: number | string;
+  /** 时长 ms；sustain 时可省略 */
+  duration?: number;
+  /** 步骤级延迟 ms（在 stagger 之前） */
+  delay?: number;
   easing?: AnimEasing;
   /** 同 group 并行，group 升序串行 */
   group?: number;
+  /** true 无限循环；数字为额外循环次数（播完一轮后再循环 N 次） */
   loop?: boolean | number;
+  /** 循环时往返（奇数轮 reverse） */
+  yoyo?: boolean;
+  /** 作用目标；默认：transform 属性 → self，其余 → children（children 穿透效果容器） */
+  targets?: AnimTarget;
+  /** 多目标时按 index 递增的额外延迟 ms */
+  stagger?: number;
+  /** 持续动画：忽略 duration 完成条件，直到 cancel */
+  sustain?: boolean;
+  /** 自定义每帧写入（返回 partial ElementData）；引擎直推，不经 React */
+  compute?: (ctx: AnimComputeContext) => Partial<ElementData>;
 }
 
 /** Animation 组件 ref 命令式 API */
