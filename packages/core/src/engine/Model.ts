@@ -1,4 +1,4 @@
-import { isEqual } from 'lodash-es';
+import { isEqual } from '../utils/object';
 import type { ElementRecord, ElementType, ElementData, VizEventType, VizEventHandler } from './types';
 import type { SceneNode, SceneTree } from './graph/SceneTree';
 import { IDENTITY_MAT3, type Mat3 } from './utils/constants/matrix';
@@ -218,7 +218,7 @@ class Model {
    * @returns 是否有变化
    */
   /**
-   * 合并 data：用 lodash isEqual 深度比较，仅写入变化字段
+   * 合并 data：用 isEqual 深度比较，仅写入变化字段
    * 比浅比较更可靠——能正确判断嵌套对象/数组是否真的变了
    */
   private mergeData(existing: ElementData, incoming: ElementData): boolean {

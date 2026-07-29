@@ -1,4 +1,4 @@
-import { pick, merge } from 'lodash-es';
+import { pick, shallowMerge } from '../../utils/object';
 import { type ReactNode } from 'react';
 import { ParentIdContext } from '../../context';
 import type { GroupData, Transform } from '../../engine/types';
@@ -24,8 +24,7 @@ interface GroupProps extends Transform, GroupData, ShapeEventProps {
  */
 function Group(props: GroupProps) {
   const { id, data, eventProps } = resolveShapeProps(props, GROUP_DATA_KEYS);
-  const transform = merge(
-    {},
+  const transform = shallowMerge(
     GROUP_TRANSFORM_DEFAULTS,
     pick(props, GROUP_TRANSFORM_KEYS),
   ) as Required<typeof GROUP_TRANSFORM_DEFAULTS>;

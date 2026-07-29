@@ -1,4 +1,4 @@
-import { isEqual } from 'lodash-es';
+import { isEqual } from '../../utils/object';
 import type {
   ElementType,
   ElementData,
@@ -418,6 +418,6 @@ class SceneTree {
   }
 }
 
-// 已用 lodash-es isEqual 替代，提供深度相等比较（涵盖数组/对象）
+// 深度相等比较见 utils/object isEqual（涵盖数组/对象）
 
 export { SceneTree, type SceneNode, type SceneListener, type SceneChangeReason };

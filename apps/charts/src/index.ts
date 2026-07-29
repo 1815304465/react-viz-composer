@@ -1,5 +1,5 @@
 ﻿/**
- * apps/charts —— 48 种参考图表实现（仅示例，不对外发布）
+ * apps/charts —— 47 种参考图表实现（仅示例，不对外发布）
  *
  * 所有图表均基于 ReactVizComposer 底层形状组件构建，
  * 遵循统一的 ChartFrame + Animation playbook 开发模式。

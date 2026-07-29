@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     conditions: ['development', 'import', 'module', 'browser', 'default'],
-    // Prefer TypeScript sources over stale tsc-emitted .js in packages/*/src
+    // Prefer TypeScript sources (do not emit .js beside .ts under packages/*/src)
     extensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.mts', '.json'],
   },
 });

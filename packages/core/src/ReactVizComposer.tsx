@@ -1,5 +1,5 @@
 import { useRef, useMemo, useState, useEffect, type ReactNode, type CSSProperties } from 'react';
-import { throttle } from 'lodash-es';
+import { throttle } from './utils/object';
 import { Graph, SceneTree } from './engine';
 import type {
   EngineType, Viewport, ElementData, ViewportCullMargin,
@@ -146,7 +146,7 @@ function ReactVizComposer(props: Props) {
     graphRef.current?.setViewport(effectiveViewport);
   }, [effectiveViewport]);
 
-  // lodash throttle 化的 resize 处理器
+  // 节流后的 resize 处理器
   const handleResize = useMemo(
     () =>
       throttle((w: number, h: number) => {

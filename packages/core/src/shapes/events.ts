@@ -1,4 +1,5 @@
 import type { VizEventType, VizEventHandler, VizDragEventHandler } from '../engine/types';
+import { pick } from '../utils/object';
 
 /**
  * 形状组件支持的事件 prop 名列表
@@ -74,8 +75,6 @@ const MOUSE_DOWN_EVENT_PROPS: VizShapeEventPropName[] = [
 ];
 
 /* ========== 事件处理函数 ========== */
-
-import { pick } from 'lodash-es';
 
 /**
  * 形状组件对外暴露的 React 风格事件 props

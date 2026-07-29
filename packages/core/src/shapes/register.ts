@@ -8,7 +8,7 @@ import {
   VIZ_SHAPE_EVENT_PROP_NAMES,
   type ShapeEventProps,
 } from './events';
-import { pick } from 'lodash-es';
+import { pick } from '../utils/object';
 
 /* ========== Shape prop keys 常量 ========== */
 

@@ -2,7 +2,7 @@
 
 声明式 SVG/Canvas 混合渲染引擎。将图表拆解为 Rect、Ellipse、Line、Path、Text、Image、Group、Animation 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。
 
-目前基于此底层组件在仓库 `apps/charts` 中提供了 **48 种二维图表参考实现**（不随 npm 发布），覆盖 ECharts 全部常见品类。
+目前基于此底层组件在仓库 `apps/charts` 中提供了 **47 种二维图表参考实现**（不随 npm 发布），覆盖 ECharts 全部常见品类。
 
 ## 包结构
 
@@ -10,7 +10,7 @@
 packages/core                 → 引擎 + 形状（主产品）
 packages/kit                  → 半成品工具组件（Axis / Grid / Tooltip），样式全部 props 可控
 packages/react-viz-composer   → umbrella：re-export core + kit
-apps/charts                   → 48 图参考实现 + ChartFrame / scales / palette（private）
+apps/charts                   → 47 图参考实现 + ChartFrame / scales / palette（private）
 apps/demo                     → 演示壳
 ```
 
@@ -85,50 +85,35 @@ graph/Graph.ts = C（控制层）
 
 ```
 ReactVizComposer/
-├── index.tsx                    # React 层：根组件 + 对外入口
-├── context.ts                   # React 层：VizContext / FrameContext / AnimationContext
-│
-├── shapes/                      # React 层：形状组件（纯代理，return null）
-│   ├── index.ts                 # 统一导出
-│   ├── events.ts                # 事件 props 定义与映射
-│   ├── register.ts              # 注册 hook + shapePropKeys + shapeProps
-│   ├── geometries/              # 几何形状（7 个）
-│   │   ├── Rect.tsx / Ellipse.tsx / Line.tsx
-│   │   ├── Path.tsx / Text.tsx / Image.tsx / Points.tsx
-│   ├── containers/              # 容器组件（5 个）
-│   │   ├── Group.tsx / Animation.tsx
-│   │   ├── ClipPath.tsx / Filter.tsx / Mask.tsx
-│   └── definitions/             # 定义类组件（2 个）
-│       └── LinearGradient.tsx / RadialGradient.tsx
-│
-└── engine/                      # 引擎层（纯 TS，零 React 依赖）
-    ├── index.ts                 # 统一导出
-    ├── types.ts                 # 所有类型定义
-    ├── Model.ts                 # M：数据层
-    ├── graph/                   # C：控制层
-    │   ├── Graph.ts             # 总调度器
-    │   ├── SceneTree.ts        # React ↔ 引擎桥梁
-    │   └── EventSystem.ts      # 合成事件系统
-    ├── renderer/                # V：渲染层
-    │   ├── Renderer.ts         # 抽象基类
-    │   ├── CanvasRenderer.ts   # Canvas 2D 渲染
-    │   └── SVGRenderer.ts      # SVG 渲染
-    └── utils/                   # 通用工具（无状态纯函数）
-        ├── index.ts             # 统一导出
-        ├── Scheduler.ts         # rAF 调度循环 + Job 队列
-        ├── constants/           # 常量定义
-        │   ├── index.ts / matrix.ts / paintOrder.ts
-        │   ├── animation.ts / opacity.ts
-        ├── maths.ts             # 矩阵变换 + 几何计算
-        ├── colors.ts            # 颜色解析 + 渐变
-        ├── viewport.ts          # 视口缩放/平移
-        ├── opacity.ts           # 透明度
-        ├── paintOrder.ts        # 绘制顺序
-        ├── bounds.ts            # 包围盒估算
-        ├── elements.ts          # 元素可见性 / 后代判断
-        ├── shapes.ts            # 形状解析
-        ├── pathCache.ts         # Path2D LRU 缓存
-        └── animations.ts        # 动画工具
+├── packages/core/src/           # 引擎 + 形状（主产品）
+│   ├── ReactVizComposer.tsx     # React 层：根组件
+│   ├── context.ts               # VizContext / FrameContext
+│   ├── index.ts                 # 对外入口
+│   ├── shapes/                  # 形状组件（纯代理，return null）
+│   │   ├── geometries/          # Rect / Ellipse / Line / Path / Text / Image / Points
+│   │   ├── containers/          # Group / Animation / ClipPath / Filter / Mask
+│   │   └── definitions/         # LinearGradient / RadialGradient
+│   └── engine/                  # 引擎层（纯 TS，零 React 依赖）
+│       ├── Model.ts / types.ts
+│       ├── graph/               # Graph / SceneTree / EventSystem
+│       ├── renderer/            # CanvasRenderer / SVGRenderer
+│       └── utils/
+├── packages/kit/src/            # Axis / Grid / Tooltip / Legend / Marks / …
+├── packages/react-viz-composer/ # umbrella：re-export core + kit
+├── apps/charts/src/             # 参考图表 + ChartFrame / scales / palette（不发布）
+└── apps/demo/                   # 演示壳
+```
+
+> 以下形状 / 引擎细节仍以 `packages/core/src` 为准；旧扁平目录布局已废弃。
+
+### 引擎内部（`packages/core/src/engine`）
+
+```
+engine/
+├── index.ts / types.ts / Model.ts
+├── graph/     Graph.ts · SceneTree.ts · EventSystem.ts
+├── renderer/  Renderer.ts · CanvasRenderer.ts · SVGRenderer.ts
+└── utils/     Scheduler · maths · colors · viewport · animations · …
 ```
 
 ## 根组件 API
@@ -393,7 +378,9 @@ export function BarChartDemo() {
 
 ```tsx
 import { Animation, Path, Line, Text, Ellipse } from '@react-viz-composer/core';
-import { ChartFrame, PLOT_WIDTH, PLOT_HEIGHT, SEMANTIC_6, TEXT_COLOR } from '@react-viz-composer/kit';
+import {
+  ChartFrame, PLOT_WIDTH, PLOT_HEIGHT, SEMANTIC_6, TEXT_COLOR,
+} from './local'; // apps/charts 本地 barrel（不进 kit）
 
 export function GaugeChart({ value = 72, min = 0, max = 100 }) {
   const cx = PLOT_WIDTH / 2;

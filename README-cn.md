@@ -1,6 +1,6 @@
 # ⚡ ReactVizComposer
 
-声明式 SVG/Canvas 混合渲染引擎。将可视化拆解为 `Rect`、`Ellipse`、`Line`、`Path`、`Text`、`Image`、`Group`、`Animation` 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。仓库 `apps/charts` 中另有 48 种参考图表实现（不随 npm 发布）。
+声明式 SVG/Canvas 混合渲染引擎。将可视化拆解为 `Rect`、`Ellipse`、`Line`、`Path`、`Text`、`Image`、`Group`、`Animation` 等底层形状，通过 React Context 投递 JSON 数据给渲染引擎，实现"声明式数据驱动 + 引擎统一渲染"的二维可视化框架。仓库 `apps/charts` 中另有 47 种参考图表实现（不随 npm 发布）。
 
 [![npm version](https://img.shields.io/npm/v/react-viz-composer)](https://www.npmjs.com/package/react-viz-composer)
 [![license](https://img.shields.io/npm/l/react-viz-composer)](./LICENSE)
@@ -9,7 +9,7 @@
 
 - **声明式数据驱动** — 写 JSX 描述形状，引擎负责渲染
 - **SVG/Canvas 双引擎** — `engine="svg"` 增量 DOM 更新，`engine="canvas"` 全量重绘 + 视口裁剪
-- **构图积木 Kit** — `ChartFrame`、`Axis`、scales、色板，通过 `@react-viz-composer/kit`（亦由 `react-viz-composer` 再导出）
+- **构图积木 Kit** — `Axis`、`Grid`、`Tooltip`、`Legend`、标注、`Crosshair`、`Brush`，通过 `@react-viz-composer/kit`（亦由 `react-viz-composer` 再导出）。`ChartFrame` / scales / 色板仅在仓库 `apps/charts` 示例中
 - **零 DOM 形状组件** — 形状组件是纯代理（`return null`），渲染完全在引擎层进行
 - **合成事件系统** — `onClick`、`onMouseEnter`、`onDrag` 等，支持 `stopPropagation()` 阻止冒泡
 - **声明式动画** — Tween 剧本，支持分组并行/串行、循环、watch 触发
@@ -43,22 +43,17 @@ function MyFirstChart() {
 
 ### 用 Kit 组合图表
 
+发布包提供形状 + kit 叠加层。图框、scale、色板是 **`apps/charts` 参考辅助**（不进 npm）：
+
 ```tsx
-import { Animation, Rect } from 'react-viz-composer';
-import {
-  ChartFrame, PLOT_WIDTH, PLOT_HEIGHT,
-  scaleBand, scaleLinear, Axis, Grid, SEMANTIC_6,
-} from 'react-viz-composer';
-// 或：from '@react-viz-composer/kit'
+import ReactVizComposer, { Animation, Rect } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
+// ChartFrame / scaleBand / SEMANTIC_6 → 仅 apps/charts（见仓库 demo）
 
-function SimpleBarChart({ data }) {
-  const categories = data.map((d) => d.month);
-  const xScale = scaleBand(categories, [0, PLOT_WIDTH], 0.3);
-  const yScale = scaleLinear([0, 300], [PLOT_HEIGHT, 0]);
-
+function SimpleBarChart({ data, xScale, yScale, plotHeight, color }) {
   return (
-    <ChartFrame>
-      <Grid scale={yScale} orient="y" />
+    <ReactVizComposer engine="svg" width={600} height={400}>
+      <Grid scale={yScale} orient="y" length={560} />
       <Animation playbook={[
         { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children' },
       ]}>
@@ -68,14 +63,14 @@ function SimpleBarChart({ data }) {
             x={xScale(d.month)}
             y={yScale(d.value)}
             width={xScale.bandwidth}
-            height={PLOT_HEIGHT - yScale(d.value)}
-            fill={SEMANTIC_6[0]}
+            height={plotHeight - yScale(d.value)}
+            fill={color}
           />
         ))}
       </Animation>
-      <Axis scale={xScale} orient="bottom" />
-      <Axis scale={yScale} orient="left" />
-    </ChartFrame>
+      <Axis scale={xScale} orient="bottom" length={560} />
+      <Axis scale={yScale} orient="left" length={plotHeight} />
+    </ReactVizComposer>
   );
 }
 ```
@@ -173,8 +168,8 @@ function SimpleBarChart({ data }) {
 | 包 | 职责 |
 |----|------|
 | `react-viz-composer` / `@react-viz-composer/core` | 引擎 + 形状原语 |
-| `@react-viz-composer/kit` | 构图积木（Frame、Axis、scales、色板） |
-| `apps/charts`（仅仓库） | 48 种参考图表实现，供 demo 使用 |
+| `@react-viz-composer/kit` | Axis、Grid、Tooltip、Legend、标注、Crosshair、Brush |
+| `apps/charts`（仅仓库） | 47 种参考图表 + ChartFrame / scales / 色板 |
 
 ## 🏗️ 架构
 

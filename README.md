@@ -1,6 +1,6 @@
 # ⚡ ReactVizComposer
 
-Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations from low-level primitives — `Rect`, `Ellipse`, `Line`, `Path`, `Text`, `Image`, `Group`, `Animation`. The repo also ships 48 reference chart implementations under `apps/charts` (not published to npm).
+Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations from low-level primitives — `Rect`, `Ellipse`, `Line`, `Path`, `Text`, `Image`, `Group`, `Animation`. The repo also ships 47 reference chart implementations under `apps/charts` (not published to npm).
 
 [![npm version](https://img.shields.io/npm/v/react-viz-composer)](https://www.npmjs.com/package/react-viz-composer)
 [![license](https://img.shields.io/npm/l/react-viz-composer)](./LICENSE)
@@ -9,7 +9,7 @@ Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations
 
 - **Declarative Data-Driven** — Write JSX shapes, the engine handles rendering
 - **Hybrid SVG/Canvas** — Choose `engine="svg"` for incremental DOM or `engine="canvas"` for full redraw + viewport culling
-- **Chart Building Kit** — `ChartFrame`, `Axis`, scales, palette via `@react-viz-composer/kit` (also re-exported from `react-viz-composer`)
+- **Chart Building Kit** — `Axis`, `Grid`, `Tooltip`, `Legend`, marks, `Crosshair`, `Brush` via `@react-viz-composer/kit` (also re-exported from `react-viz-composer`). `ChartFrame` / scales / palette live in `apps/charts` (repo examples only)
 - **Zero-DOM Shapes** — Shape components are pure proxies that `return null`; all rendering happens in the engine layer
 - **Synthetic Event System** — `onClick`, `onMouseEnter`, `onDrag`, etc. with `stopPropagation()` support
 - **Animation System** — Declarative tween playbooks with grouping, looping, and watch triggers
@@ -43,22 +43,17 @@ function MyFirstChart() {
 
 ### Building a Chart with the Kit
 
+Published packages give you shapes + kit overlays. Plot frame, scales, and palettes are **reference helpers** in `apps/charts` (not on npm):
+
 ```tsx
-import { Animation, Rect } from 'react-viz-composer';
-import {
-  ChartFrame, PLOT_WIDTH, PLOT_HEIGHT,
-  scaleBand, scaleLinear, Axis, Grid, SEMANTIC_6,
-} from 'react-viz-composer';
-// or: from '@react-viz-composer/kit'
+import ReactVizComposer, { Animation, Rect } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
+// ChartFrame / scaleBand / SEMANTIC_6 → apps/charts only (see repo demos)
 
-function SimpleBarChart({ data }) {
-  const categories = data.map((d) => d.month);
-  const xScale = scaleBand(categories, [0, PLOT_WIDTH], 0.3);
-  const yScale = scaleLinear([0, 300], [PLOT_HEIGHT, 0]);
-
+function SimpleBarChart({ data, xScale, yScale, plotHeight, color }) {
   return (
-    <ChartFrame>
-      <Grid scale={yScale} orient="y" />
+    <ReactVizComposer engine="svg" width={600} height={400}>
+      <Grid scale={yScale} orient="y" length={560} />
       <Animation playbook={[
         { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children' },
       ]}>
@@ -68,14 +63,14 @@ function SimpleBarChart({ data }) {
             x={xScale(d.month)}
             y={yScale(d.value)}
             width={xScale.bandwidth}
-            height={PLOT_HEIGHT - yScale(d.value)}
-            fill={SEMANTIC_6[0]}
+            height={plotHeight - yScale(d.value)}
+            fill={color}
           />
         ))}
       </Animation>
-      <Axis scale={xScale} orient="bottom" />
-      <Axis scale={yScale} orient="left" />
-    </ChartFrame>
+      <Axis scale={xScale} orient="bottom" length={560} />
+      <Axis scale={yScale} orient="left" length={plotHeight} />
+    </ReactVizComposer>
   );
 }
 ```
@@ -172,8 +167,8 @@ Children use **final visual props**; `from` is the entry start. `targets: 'child
 | Package | Role |
 |---------|------|
 | `react-viz-composer` / `@react-viz-composer/core` | Engine + shape primitives |
-| `@react-viz-composer/kit` | Chart building blocks (Frame, Axis, scales, palette) |
-| `apps/charts` (repo only) | 48 reference chart implementations for demos |
+| `@react-viz-composer/kit` | Axis, Grid, Tooltip, Legend, marks, Crosshair, Brush |
+| `apps/charts` (repo only) | 47 reference charts + ChartFrame / scales / palette |
 
 ## 🏗️ Architecture
 
