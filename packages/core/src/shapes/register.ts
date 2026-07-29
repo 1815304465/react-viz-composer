@@ -61,7 +61,7 @@ const IMAGE_DATA_KEYS = [
   ...SHAPE_COMMON_KEYS,
 ] as const;
 
-const GROUP_DATA_KEYS = [...SHAPE_COMMON_KEYS, 'filter', 'mask'] as const;
+const GROUP_DATA_KEYS = [...SHAPE_COMMON_KEYS, 'clipPath', 'filter', 'mask'] as const;
 
 const GROUP_TRANSFORM_KEYS = [
   'x', 'y', 'rotation', 'scaleX', 'scaleY',

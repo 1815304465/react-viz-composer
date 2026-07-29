@@ -115,6 +115,12 @@ function ReactVizComposer(props: Props) {
     // 首次同步 SceneTree
     graph.applyScene(sceneTree.root);
 
+    // 注入 flush 调度器：将 updateNode 缓冲到同帧末尾批量处理
+    // 通过 Scheduler.enqueueJob 在渲染后的时间预算内执行
+    sceneTree.setFlushScheduler(() => {
+      graph.enqueueJob(() => sceneTree.flushUpdates(), 0);
+    });
+
     // 注册根事件处理器：将 canvasEventProps 转为 EventSystem 事件表并注入
     if (canvasEventProps) {
       const rootEvents = buildShapeEvents(

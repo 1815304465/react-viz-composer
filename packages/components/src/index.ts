@@ -58,6 +58,8 @@ export type { ChartItemHoverProps } from './shared/chartEvents';
 export {
   ChartEntryProgressProvider,
   useEntryProgress,
+  useEntryAnimation,
+  EntryAnimationRegistry,
   createEntryProgressStore,
 } from './shared/useEntryProgress';
 export type { EntryProgressStore } from './shared/useEntryProgress';

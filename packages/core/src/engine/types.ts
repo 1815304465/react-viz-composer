@@ -221,6 +221,7 @@ export interface GroupData {
   pointerEvents?: 'auto' | 'none';
   zIndex?: number;
   transform?: Transform;
+  clipPath?: string;
   filter?: string;
   mask?: string;
 }

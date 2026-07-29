@@ -1,0 +1,13 @@
+export { Rect } from './geometries/Rect';
+export { Ellipse } from './geometries/Ellipse';
+export { Line } from './geometries/Line';
+export { Path } from './geometries/Path';
+export { Text } from './geometries/Text';
+export { Image } from './geometries/Image';
+export { LinearGradient } from './definitions/LinearGradient';
+export { RadialGradient } from './definitions/RadialGradient';
+export { ClipPath } from './definitions/ClipPath';
+export { Filter } from './definitions/Filter';
+export { Mask } from './definitions/Mask';
+export { Group } from './containers/Group';
+export { Animation } from './containers/Animation';

@@ -49,6 +49,12 @@ type SceneChangeReason =
  * - updateNode：增量更新节点数据，只标自身脏
  * - drainDirtyNodes：取出脏节点 id 集合，供渲染器按需重画
  */
+/** updateNode 的缓冲条目 */
+interface UpdateBufferEntry {
+  data?: Partial<ElementData>;
+  events?: Partial<Record<VizEventType, VizEventHandler>>;
+}
+
 class SceneTree {
   /** 根节点（虚拟），children 是顶层节点 */
   readonly root: SceneNode;
@@ -68,6 +74,15 @@ class SceneTree {
    * 这里排队等父节点就位后 flush。
    */
   private pendingRegistrations: Array<{ parentId: string; node: SceneNode }> = [];
+  /**
+   * updateNode 缓冲：同帧多次 update 合并，flush 时一次性处理。
+   * key 为节点 id，同 id 的后写入覆盖先写入。
+   */
+  private updateBuffer = new Map<string, UpdateBufferEntry>();
+  /** 是否已调度 flush（防止重复调度） */
+  private updateScheduled = false;
+  /** 外部注入的 flush 调度器 */
+  private flushScheduler: (() => void) | null = null;
 
   constructor() {
     this.root = {
@@ -137,8 +152,8 @@ class SceneTree {
     const remaining: Array<{ parentId: string; node: SceneNode }> = [];
     for (const item of this.pendingRegistrations) {
       if (item.parentId === parentId) {
-        // 父已就位，递归调用 registerNode（parentId 设为 undefined 跳过"父不存在"检查）
-        this.registerNode(undefined, item.node);
+        // 父已就位，挂到正确的 parentId 下（不可传 undefined，否则会误挂到根节点）
+        this.registerNode(parentId, item.node);
       } else {
         remaining.push(item);
       }
@@ -173,35 +188,96 @@ class SceneTree {
   }
 
   /**
+   * 设置 flush 调度器。外部（ReactVizComposer）注入，
+   * 通常在 mount 后用 graph.enqueueJob 包裹 flushUpdates()。
+   * @param fn 调度函数，调用即触发 flushUpdates
+   */
+  setFlushScheduler(fn: () => void): void {
+    this.flushScheduler = fn;
+  }
+
+  /**
+   * 批量 flush 缓冲的 update：对每个节点做 isEqual 比较、merge、标脏，
+   * 最后统一 notify 一次。
+   * 由 flushScheduler 在帧末（渲染前）触发。
+   */
+  flushUpdates(): void {
+    if (this.updateBuffer.size === 0) {
+      this.updateScheduled = false;
+      return;
+    }
+
+    let anyChanged = false;
+
+    for (const [id, entry] of this.updateBuffer) {
+      const node = this.index.get(id);
+      if (!node) continue;
+
+      let changed = false;
+      if (entry.data) {
+        for (const [k, v] of Object.entries(entry.data)) {
+          if (!isEqual((node.data as Record<string, unknown>)[k], v)) {
+            (node.data as Record<string, unknown>)[k] = v;
+            changed = true;
+          }
+        }
+      }
+      if (entry.events) {
+        node.events = { ...node.events, ...entry.events };
+        changed = true;
+      }
+      if (changed) {
+        node.dirty = true;
+        this.dirtyNodeIds.add(id);
+        anyChanged = true;
+      }
+    }
+
+    this.updateBuffer.clear();
+    this.updateScheduled = false;
+
+    if (anyChanged) {
+      this.notify('update');
+    }
+  }
+
+  /**
    * 更新一个节点的数据（只动自己，不冒泡到父级）
+   *
+   * 同帧多次 update 合并：partial 写入 updateBuffer，由 flushScheduler
+   * 在帧末统一 merge + notify。register / unregister 仍立即生效。
+   *
    * @param id 节点 id
    * @param partial 部分更新的 data / events
-   * @returns 是否真的有变化
+   * @returns 是否真的有变化（buffer 模式下始终返回 true 表示已入队）
    */
   updateNode(id: string, partial: { data?: Partial<ElementData>; events?: Partial<Record<VizEventType, VizEventHandler>> }): boolean {
     const node = this.index.get(id);
     if (!node) return false;
 
-    let changed = false;
-    if (partial.data) {
-      // 浅比较：任一字段不同即认为变化
-      for (const [k, v] of Object.entries(partial.data)) {
-        if (!isEqual((node.data as Record<string, unknown>)[k], v)) {
-          (node.data as Record<string, unknown>)[k] = v;
-          changed = true;
-        }
+    // 合并到 buffer：同 id 的后写入覆盖先写入
+    const existing = this.updateBuffer.get(id);
+    if (existing) {
+      if (partial.data) {
+        existing.data = { ...existing.data, ...partial.data };
       }
+      if (partial.events) {
+        existing.events = { ...existing.events, ...partial.events };
+      }
+    } else {
+      this.updateBuffer.set(id, {
+        data: partial.data ? { ...partial.data } : undefined,
+        events: partial.events ? { ...partial.events } : undefined,
+      });
     }
-    if (partial.events) {
-      node.events = { ...node.events, ...partial.events };
-      changed = true;
+
+    // 调度 flush（只调度一次）
+    if (!this.updateScheduled && this.flushScheduler) {
+      this.updateScheduled = true;
+      this.flushScheduler();
     }
-    if (changed) {
-      node.dirty = true;
-      this.dirtyNodeIds.add(id);
-      this.notify('update');
-    }
-    return changed;
+
+    return true;
   }
 
   // ========== 查询 ==========
@@ -277,6 +353,8 @@ class SceneTree {
     this.dirtyNodeIds.clear();
     this.subtreeDirtyIds.clear();
     this.pendingRegistrations = [];
+    this.updateBuffer.clear();
+    this.updateScheduled = false;
   }
 
   // ========== 内部工具 ==========
