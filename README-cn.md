@@ -9,7 +9,7 @@
 
 - **声明式数据驱动** — 写 JSX 描述形状，引擎负责渲染
 - **SVG/Canvas 双引擎** — `engine="svg"` 增量 DOM 更新，`engine="canvas"` 全量重绘 + 视口裁剪
-- **构图积木 Kit** — `Axis`、`Grid`、`Tooltip`、`Legend`、标注、`Crosshair`、`Brush`，通过 `@react-viz-composer/kit`（亦由 `react-viz-composer` 再导出）。`ChartFrame` / scales / 色板仅在仓库 `apps/charts` 示例中
+- **构图积木组件** — `Axis`、`Grid`、`Tooltip`、`Legend`、标注、`Crosshair`、`Brush`（位于 `components/`）。`ChartFrame` / scales / 色板仅在仓库 `apps/charts` 示例中
 - **零 DOM 形状组件** — 形状组件是纯代理（`return null`），渲染完全在引擎层进行
 - **合成事件系统** — `onClick`、`onMouseEnter`、`onDrag` 等，支持 `stopPropagation()` 阻止冒泡
 - **声明式动画** — Tween 剧本，支持分组并行/串行、循环、watch 触发
@@ -20,8 +20,6 @@
 
 ```bash
 npm install react-viz-composer
-# 或分别安装：
-# npm install @react-viz-composer/core @react-viz-composer/kit
 ```
 
 需要 `react` 和 `react-dom` 作为 peer dependencies（>=18.0.0）。
@@ -41,13 +39,12 @@ function MyFirstChart() {
 }
 ```
 
-### 用 Kit 组合图表
+### 用辅助组件组合图表
 
-发布包提供形状 + kit 叠加层。图框、scale、色板是 **`apps/charts` 参考辅助**（不进 npm）：
+发布包同时提供形状与 Axis/Grid 等组件。图框、scale、色板是 **`apps/charts` 参考辅助**（不进 npm）：
 
 ```tsx
-import ReactVizComposer, { Animation, Rect } from 'react-viz-composer';
-import { Axis, Grid } from 'react-viz-composer';
+import ReactVizComposer, { Animation, Rect, Axis, Grid } from 'react-viz-composer';
 // ChartFrame / scaleBand / SEMANTIC_6 → 仅 apps/charts（见仓库 demo）
 
 function SimpleBarChart({ data, xScale, yScale, plotHeight, color }) {
@@ -167,9 +164,8 @@ function SimpleBarChart({ data, xScale, yScale, plotHeight, color }) {
 
 | 包 | 职责 |
 |----|------|
-| `react-viz-composer` / `@react-viz-composer/core` | 引擎 + 形状原语 |
-| `@react-viz-composer/kit` | Axis、Grid、Tooltip、Legend、标注、Crosshair、Brush |
-| `apps/charts`（仅仓库） | 47 种参考图表 + ChartFrame / scales / 色板 |
+| `react-viz-composer` | 引擎 + 形状 + components（Axis / Grid / Tooltip / Legend / marks / Crosshair / Brush） |
+| `apps/charts`（仅仓库） | 参考图表 + ChartFrame / scales / 色板 |
 
 ## 🏗️ 架构
 

@@ -4,7 +4,7 @@
  * 线色 / 线宽 / 长度全部由 props 控制。
  */
 
-import { Line } from '@react-viz-composer/core';
+import { Line } from '../shapes';
 import type { AxisScale, BandScaleLike, LinearScaleLike } from './Axis';
 
 export interface GridProps {

@@ -7,14 +7,12 @@
 ## 包结构
 
 ```
-packages/core                 → 引擎 + 形状（主产品）
-packages/kit                  → 半成品工具组件（Axis / Grid / Tooltip），样式全部 props 可控
-packages/react-viz-composer   → umbrella：re-export core + kit
-apps/charts                   → 47 图参考实现 + ChartFrame / scales / palette（private）
-apps/demo                     → 演示壳
+packages/   → 唯一 npm 发布包 react-viz-composer（引擎 + 形状 + components）
+apps/charts → 参考图表实现 + ChartFrame / scales / palette（private）
+apps/demo   → 演示壳
 ```
 
-依赖关系：`demo → charts → kit → core`；`ChartFrame`、色板、scale 仅在 `apps/charts`，不进入 kit 发布面。
+依赖关系：`demo → charts → react-viz-composer`；`ChartFrame`、色板、scale 仅在 `apps/charts`，不进入发布面。
 
 ```
 用户 JSX（Rect / Group / Line / ...）
@@ -22,8 +20,9 @@ apps/demo                     → 演示壳
     │ 子组件将 props 拆解为 JSON，通过 VizContext 投递
     ▼
 ┌──────────────────────────────────────────┐
-│  React 层（index.tsx / context.ts / shapes/） │
-│  - 形状组件：纯代理，return null              │
+│  React 层（ReactVizComposer.tsx / context.ts / shapes/ / components/） │
+│  - 形状组件：纯代理，return null（容器提供 ParentIdContext） │
+│  - components/：Axis / Grid / Tooltip 等半成品 React 组件 │
 │  - VizContext：register / update / unregister │
 │  - VizFrameContext：requestFrame / enqueueJob  │
 └────────────────────┬─────────────────────┘
@@ -79,34 +78,35 @@ graph/Graph.ts = C（控制层）
 - **渲染引擎仅两个**：`CanvasRenderer` 和 `SVGRenderer`。WebGL/WebGPU 已移除。
 - **事件在 EventSystem 统一处理**：形状组件的 `onClick`/`onMouseEnter` 等 props 转为事件表注册到 SceneTree，EventSystem 统一分发。支持 stopPropagation 阻止冒泡。
 - **引擎层零 React 依赖**：`engine/` 目录下所有代码均为纯 TypeScript，可独立测试。
-- **目录分离**：React 层（`index.tsx` / `context.ts` / `shapes/`）与引擎层（`engine/`）严格隔离。
+- **目录分离**：React 层（`ReactVizComposer.tsx` / `context.ts` / `shapes/` / `components/`）与引擎层（`engine/`）严格隔离。
 
 ## 目录结构
 
 ```
 ReactVizComposer/
-├── packages/core/src/           # 引擎 + 形状（主产品）
-│   ├── ReactVizComposer.tsx     # React 层：根组件
-│   ├── context.ts               # VizContext / FrameContext
-│   ├── index.ts                 # 对外入口
-│   ├── shapes/                  # 形状组件（纯代理，return null）
-│   │   ├── geometries/          # Rect / Ellipse / Line / Path / Text / Image / Points
-│   │   ├── containers/          # Group / Animation / ClipPath / Filter / Mask
-│   │   └── definitions/         # LinearGradient / RadialGradient
-│   └── engine/                  # 引擎层（纯 TS，零 React 依赖）
-│       ├── Model.ts / types.ts
-│       ├── graph/               # Graph / SceneTree / EventSystem
-│       ├── renderer/            # CanvasRenderer / SVGRenderer
-│       └── utils/
-├── packages/kit/src/            # Axis / Grid / Tooltip / Legend / Marks / …
-├── packages/react-viz-composer/ # umbrella：re-export core + kit
-├── apps/charts/src/             # 参考图表 + ChartFrame / scales / palette（不发布）
-└── apps/demo/                   # 演示壳
+├── packages/                        # 唯一发布包（package.json name: react-viz-composer）
+│   ├── package.json / vite.config.ts / tsconfig*.json
+│   └── src/
+│       ├── ReactVizComposer.tsx     # React 层：根组件
+│       ├── context.ts               # VizContext / FrameContext
+│       ├── index.ts                 # 对外入口（形状 + components + 引擎）
+│       ├── shapes/                  # 形状组件（纯代理；容器提供 ParentIdContext）
+│       │   ├── geometries/          # Rect / Ellipse / Line / Path / Text / Image / Points
+│       │   ├── containers/          # Group / Animation / ClipPath / Filter / Mask
+│       │   └── definitions/         # LinearGradient / RadialGradient
+│       ├── components/              # 半成品工具组件（Axis / Grid / Tooltip / …）
+│       └── engine/                  # 引擎层（纯 TS，零 React 依赖）
+│           ├── Model.ts / types.ts
+│           ├── graph/               # Graph / SceneTree / EventSystem
+│           ├── renderer/            # CanvasRenderer / SVGRenderer
+│           └── utils/
+├── apps/charts/src/                 # 参考图表 + ChartFrame / scales / palette（不发布）
+└── apps/demo/                       # 演示壳
 ```
 
-> 以下形状 / 引擎细节仍以 `packages/core/src` 为准；旧扁平目录布局已废弃。
+> 形状 / 引擎细节以 `packages/src` 为准。
 
-### 引擎内部（`packages/core/src/engine`）
+### 引擎内部（`packages/src/engine`）
 
 ```
 engine/
@@ -266,8 +266,8 @@ function Rect(props: RectData & ShapeEventProps & { id?: string }) {
 所有图表遵循统一模式，以 HorizontalBarChart 为例：形状写**最终视觉 props**，入场动画用 `<Animation playbook>`，`ChartFrame` 直接接收 children（不再使用 progress render prop / `useEntryProgress`）。
 
 ```tsx
-import { Animation, Rect, Text } from '@react-viz-composer/core';
-import { Axis, Grid } from '@react-viz-composer/kit';
+import { Animation, Rect, Text } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
 import {
   ChartFrame, useChartSize,
   useChartItemHover, hoverStrokeWidth, type ChartItemHoverProps,
@@ -357,30 +357,30 @@ export function BarChartDemo() {
 
 | 路径 | 说明 |
 |------|------|
-| `packages/kit/src/Axis.tsx` | 半成品坐标轴（length/crossAt/颜色/字号均 props） |
-| `packages/kit/src/Grid.tsx` | 半成品网格线（length/stroke 均 props） |
-| `packages/kit/src/Tooltip.tsx` | 半成品浮层（位置/样式均 props） |
-| `packages/kit/src/Legend.tsx` | 半成品图例（items + onItem* 事件，自行对接系列显隐） |
-| `packages/kit/src/MarkLine.tsx` / `MarkPoint.tsx` / `MarkArea.tsx` | 阈值线 / 标注点 / 区间阴影 |
-| `packages/kit/src/Crosshair.tsx` | 十字准星（受控 x/y，配合 onMouseMove） |
-| `packages/kit/src/Brush.tsx` | 框选矩形（受控几何，配合拖拽事件） |
+| `packages/src/components/Axis.tsx` | 半成品坐标轴（length/crossAt/颜色/字号均 props） |
+| `packages/src/components/Grid.tsx` | 半成品网格线（length/stroke 均 props） |
+| `packages/src/components/Tooltip.tsx` | 半成品浮层（位置/样式均 props） |
+| `packages/src/components/Legend.tsx` | 半成品图例（items + onItem* 事件，自行对接系列显隐） |
+| `packages/src/components/MarkLine.tsx` / `MarkPoint.tsx` / `MarkArea.tsx` | 阈值线 / 标注点 / 区间阴影 |
+| `packages/src/components/Crosshair.tsx` | 十字准星（受控 x/y，配合 onMouseMove） |
+| `packages/src/components/Brush.tsx` | 框选矩形（受控几何，配合拖拽事件） |
 | `apps/charts/src/shared/ChartFrame.tsx` | 示例外框（跟随父级宽高） |
 | `apps/charts/src/local.ts` | 示例本地 barrel（scales/palette/hover） |
 | `apps/charts/src/mockData.ts` | 图表 mock 数据 |
 | `apps/demo/src/components/ChartDemos.tsx` | Demo 函数 |
-| `apps/demo/src/components/ChartHoverShell.tsx` | Demo Tooltip 壳（基于 kit Tooltip） |
+| `apps/demo/src/components/ChartHoverShell.tsx` | Demo Tooltip 壳（基于 components/Tooltip） |
 
-> 入场动画统一由 core 的 `<Animation playbook>` 驱动。
+> 入场动画统一由 `<Animation playbook>` 驱动。
 
 ## 仪表盘示例
 
 图表入场与持续动画统一用 `<Animation playbook>`，子节点写最终视觉值（可用命名 `id` 作为 target）。几何上：`sweep-flag=1`（顺时针），`large-arc-flag=0`（短弧），从 225° 顺时针 90° 到 315°。
 
 ```tsx
-import { Animation, Path, Line, Text, Ellipse } from '@react-viz-composer/core';
+import { Animation, Path, Line, Text, Ellipse } from 'react-viz-composer';
 import {
   ChartFrame, PLOT_WIDTH, PLOT_HEIGHT, SEMANTIC_6, TEXT_COLOR,
-} from './local'; // apps/charts 本地 barrel（不进 kit）
+} from './local'; // apps/charts 本地 barrel（不进发布包）
 
 export function GaugeChart({ value = 72, min = 0, max = 100 }) {
   const cx = PLOT_WIDTH / 2;

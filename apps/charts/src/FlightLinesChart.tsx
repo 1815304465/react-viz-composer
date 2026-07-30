@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Path, Ellipse, Text } from '@react-viz-composer/core';
+import { Animation, Path, Ellipse, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

@@ -4,7 +4,7 @@
  * 位置完全受控（x/y）；需开发者在图表 onMouseMove 中更新坐标后才有意义。
  */
 
-import { Line } from '@react-viz-composer/core';
+import { Line } from '../shapes';
 
 export interface CrosshairProps {
   /** 为 false 或不传坐标时不画 */

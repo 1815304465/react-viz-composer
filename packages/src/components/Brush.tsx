@@ -4,8 +4,8 @@
  * 矩形几何完全受控；拖拽起止需开发者监听画布/空白区事件后写入 x/y/width/height。
  */
 
-import { Rect } from '@react-viz-composer/core';
-import type { ShapeEventProps } from '@react-viz-composer/core';
+import { Rect } from '../shapes';
+import type { ShapeEventProps } from '../shapes/events';
 
 export interface BrushProps extends ShapeEventProps {
   /** 为 false 或宽高无效时不画 */

@@ -3,14 +3,14 @@
  */
 
 import { useMemo, useId, useCallback } from 'react';
-import { Animation, Points } from '@react-viz-composer/core';
-import type { VizEvent } from '@react-viz-composer/core';
+import { Animation, Points } from 'react-viz-composer';
+import type { VizEvent } from 'react-viz-composer';
 
 import { scatterData } from './mockData';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

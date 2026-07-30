@@ -81,7 +81,7 @@ export function DocsPage() {
           <TocItem href="#animation">动画</TocItem>
           <TocItem href="#engine">渲染引擎</TocItem>
           <TocItem href="#viewport">视口裁剪</TocItem>
-          <TocItem href="#kit">半成品工具 (kit)</TocItem>
+          <TocItem href="#components">半成品工具 (components)</TocItem>
           <TocItem href="#patterns">图表开发模式</TocItem>
           <TocItem href="#types">类型导出</TocItem>
         </ul>
@@ -97,17 +97,16 @@ export function DocsPage() {
         <Section id="getting-started" title="快速开始">
           <SubSection title="安装">
             <CodeExample
-              code="npm install @react-viz-composer/core @react-viz-composer/kit"
+              code="npm install react-viz-composer"
               lang="bash"
             />
             <p style={{ marginTop: 12 }}>
-              核心功能由 <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3, fontSize: 13, fontFamily: 'monospace' }}>@react-viz-composer/core</code> 提供，
-              半成品工具组件（坐标轴、网格等）由 <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3, fontSize: 13, fontFamily: 'monospace' }}>@react-viz-composer/kit</code> 提供。
+              从 <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 3, fontSize: 13, fontFamily: 'monospace' }}>react-viz-composer</code> 一次安装即可获得引擎、形状与 Axis / Grid / Tooltip 等半成品组件。
             </p>
           </SubSection>
 
           <SubSection title="最小示例">
-            <CodeExample code={`import { ReactVizComposer, Rect, Text } from '@react-viz-composer/core';
+            <CodeExample code={`import { ReactVizComposer, Rect, Text } from 'react-viz-composer';
 
 export default function App() {
   return (
@@ -125,8 +124,8 @@ export default function App() {
           </SubSection>
 
           <SubSection title="你的第一个图表">
-            <CodeExample code={`import { ReactVizComposer, Rect, Animation } from '@react-viz-composer/core';
-import { Axis, Grid } from '@react-viz-composer/kit';
+            <CodeExample code={`import { ReactVizComposer, Rect, Animation } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
 
 const data = [
   { name: 'A', value: 40 },
@@ -435,10 +434,10 @@ export function BarChart() {
           </p>
         </Section>
 
-        {/* ── kit ── */}
-        <Section id="kit" title="半成品工具 (kit)">
+        {/* ── components ── */}
+        <Section id="components" title="半成品工具 (components)">
           <p>
-            <code>@react-viz-composer/kit</code> 提供即用的可视化辅助组件，样式全部通过 props 控制。
+            <code>react-viz-composer</code> 的 <code>components/</code> 提供即用的可视化辅助组件，样式全部通过 props 控制。
           </p>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
@@ -473,8 +472,8 @@ export function BarChart() {
         {/* ── 图表开发模式 ── */}
         <Section id="patterns" title="图表开发模式">
           <p>所有图表遵循统一模式，以 HorizontalBarChart 为例：</p>
-          <CodeExample code={`import { Animation, Rect, Text } from '@react-viz-composer/core';
-import { Axis, Grid } from '@react-viz-composer/kit';
+          <CodeExample code={`import { Animation, Rect, Text } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
 
 export function HorizontalBarChart(props: Props) {
   const { data, color = '#1677ff', onItemEnter, onItemLeave } = props;
@@ -513,7 +512,7 @@ export function HorizontalBarChart(props: Props) {
 
         {/* ── 类型导出 ── */}
         <Section id="types" title="类型导出">
-          <p>以下类型可以从 <code>@react-viz-composer/core</code> 导入：</p>
+          <p>以下类型可以从 <code>react-viz-composer</code> 导入：</p>
           <CodeExample code={`import type {
   // 渲染上下文
   VizRenderer,
@@ -536,7 +535,7 @@ export function HorizontalBarChart(props: Props) {
 
   // 根组件
   ReactVizComposerProps, Viewport, CullMargin,
-} from '@react-viz-composer/core';`} />
+} from 'react-viz-composer';`} />
         </Section>
 
         <div style={{

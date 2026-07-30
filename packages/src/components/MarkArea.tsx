@@ -4,8 +4,8 @@
  * 像素矩形优先；也可传数据范围 + scale，由本组件做映射。
  */
 
-import { Rect, Text } from '@react-viz-composer/core';
-import type { ShapeEventProps } from '@react-viz-composer/core';
+import { Rect, Text } from '../shapes';
+import type { ShapeEventProps } from '../shapes/events';
 import type { LinearScaleLike } from './Axis';
 
 export interface MarkAreaProps extends ShapeEventProps {

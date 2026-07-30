@@ -4,8 +4,8 @@
  * 只画线与可选标签；像素位置或 value+scale 由开发者计算后传入。
  */
 
-import { Line, Text } from '@react-viz-composer/core';
-import type { ShapeEventProps } from '@react-viz-composer/core';
+import { Line, Text } from '../shapes';
+import type { ShapeEventProps } from '../shapes/events';
 import type { LinearScaleLike } from './Axis';
 
 export interface MarkLineProps extends ShapeEventProps {

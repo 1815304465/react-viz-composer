@@ -5,8 +5,8 @@
  */
 
 import { useMemo, useState, useId } from 'react';
-import { Animation, Points, Line, Text, Rect } from '@react-viz-composer/core';
-import type { VizEvent } from '@react-viz-composer/core';
+import { Animation, Points, Line, Text, Rect } from 'react-viz-composer';
+import type { VizEvent } from 'react-viz-composer';
 import {
   ExplorableChartFrame,
   CATEGORY_12,

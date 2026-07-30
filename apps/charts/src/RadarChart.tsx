@@ -2,7 +2,7 @@
  * RadarChart —— 雷达图
  */
 
-import { Animation, Line, Ellipse, Text } from '@react-viz-composer/core';
+import { Animation, Line, Ellipse, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   CHART_WIDTH,

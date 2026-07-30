@@ -2,11 +2,11 @@
  * SmoothLineChart —— 平滑曲线图
  */
 
-import { Animation, Path, Ellipse, Text } from '@react-viz-composer/core';
+import { Animation, Path, Ellipse, Text } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

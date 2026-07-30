@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import ReactVizComposer from '@react-viz-composer/core';
+import ReactVizComposer from 'react-viz-composer';
 import { GRID_COLOR } from '../utils/palette';
 import { CHART_DEFAULT_VIEWPORT } from './ChartFrame';
 

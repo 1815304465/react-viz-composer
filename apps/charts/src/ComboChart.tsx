@@ -3,11 +3,11 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Animation, Rect, Path, Ellipse, Text, LinearGradient } from '@react-viz-composer/core';
+import { Animation, Rect, Path, Ellipse, Text, LinearGradient } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

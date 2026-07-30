@@ -92,7 +92,7 @@ for (const file of fs.readdirSync(DIR)) {
  */
 
 import { Fragment } from 'react';
-import { Rect, Text } from '@react-viz-composer/core';
+import { Rect, Text } from 'react-viz-composer';
 import { TEXT_COLOR, useChartSize } from './local';
 
 interface LegendItem {

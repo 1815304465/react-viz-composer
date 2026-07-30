@@ -7,8 +7,8 @@
 import {
   useState, useCallback, type ReactNode,
 } from 'react';
-import type { VizEvent } from '@react-viz-composer/core';
-import { Tooltip } from '@react-viz-composer/kit';
+import type { VizEvent } from 'react-viz-composer';
+import { Tooltip } from 'react-viz-composer';
 
 interface TooltipState {
   visible: boolean;

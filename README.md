@@ -9,7 +9,7 @@ Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations
 
 - **Declarative Data-Driven** — Write JSX shapes, the engine handles rendering
 - **Hybrid SVG/Canvas** — Choose `engine="svg"` for incremental DOM or `engine="canvas"` for full redraw + viewport culling
-- **Chart Building Kit** — `Axis`, `Grid`, `Tooltip`, `Legend`, marks, `Crosshair`, `Brush` via `@react-viz-composer/kit` (also re-exported from `react-viz-composer`). `ChartFrame` / scales / palette live in `apps/charts` (repo examples only)
+- **Chart Building Kit** — `Axis`, `Grid`, `Tooltip`, `Legend`, marks, `Crosshair`, `Brush` shipped in `react-viz-composer` under `components/`. `ChartFrame` / scales / palette live in `apps/charts` (repo examples only)
 - **Zero-DOM Shapes** — Shape components are pure proxies that `return null`; all rendering happens in the engine layer
 - **Synthetic Event System** — `onClick`, `onMouseEnter`, `onDrag`, etc. with `stopPropagation()` support
 - **Animation System** — Declarative tween playbooks with grouping, looping, and watch triggers
@@ -20,8 +20,6 @@ Declarative SVG/Canvas hybrid rendering engine for React. Compose visualizations
 
 ```bash
 npm install react-viz-composer
-# or install packages separately:
-# npm install @react-viz-composer/core @react-viz-composer/kit
 ```
 
 Requires `react` and `react-dom` as peer dependencies (>=18.0.0).
@@ -41,13 +39,12 @@ function MyFirstChart() {
 }
 ```
 
-### Building a Chart with the Kit
+### Building a Chart with Helpers
 
-Published packages give you shapes + kit overlays. Plot frame, scales, and palettes are **reference helpers** in `apps/charts` (not on npm):
+Published package gives you shapes + overlay components. Plot frame, scales, and palettes are **reference helpers** in `apps/charts` (not on npm):
 
 ```tsx
-import ReactVizComposer, { Animation, Rect } from 'react-viz-composer';
-import { Axis, Grid } from 'react-viz-composer';
+import ReactVizComposer, { Animation, Rect, Axis, Grid } from 'react-viz-composer';
 // ChartFrame / scaleBand / SEMANTIC_6 → apps/charts only (see repo demos)
 
 function SimpleBarChart({ data, xScale, yScale, plotHeight, color }) {
@@ -166,9 +163,8 @@ Children use **final visual props**; `from` is the entry start. `targets: 'child
 
 | Package | Role |
 |---------|------|
-| `react-viz-composer` / `@react-viz-composer/core` | Engine + shape primitives |
-| `@react-viz-composer/kit` | Axis, Grid, Tooltip, Legend, marks, Crosshair, Brush |
-| `apps/charts` (repo only) | 47 reference charts + ChartFrame / scales / palette |
+| `react-viz-composer` | Engine + shapes + components (Axis, Grid, Tooltip, Legend, marks, Crosshair, Brush) |
+| `apps/charts` (repo only) | Reference charts + ChartFrame / scales / palette |
 
 ## 🏗️ Architecture
 

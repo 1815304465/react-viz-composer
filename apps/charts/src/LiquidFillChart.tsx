@@ -5,7 +5,7 @@
  * 入场后波浪持续循环流动，振幅呼吸式变化。
  */
 
-import { Animation, Path, Ellipse, Text, ClipPath } from '@react-viz-composer/core';
+import { Animation, Path, Ellipse, Text, ClipPath } from 'react-viz-composer';
 import {
   ChartFrame,
   SEMANTIC_6,

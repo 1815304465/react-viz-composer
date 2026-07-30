@@ -5,11 +5,11 @@
  * 入场：内外边界曲线沿路径绘完后，梳齿再沿轮廓顺序逐根从内侧延展到外侧。
  */
 
-import { Animation, Path, Line } from '@react-viz-composer/core';
+import { Animation, Path, Line } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   scaleLinear,

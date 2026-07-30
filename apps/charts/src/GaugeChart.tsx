@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Path, Line, Text, Ellipse } from '@react-viz-composer/core';
+import { Animation, Path, Line, Text, Ellipse } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

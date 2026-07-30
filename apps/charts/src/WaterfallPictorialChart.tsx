@@ -5,11 +5,11 @@
  */
 
 import { Fragment } from 'react';
-import { Animation, Rect, Text, Image } from '@react-viz-composer/core';
+import { Animation, Rect, Text, Image } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

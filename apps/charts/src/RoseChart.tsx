@@ -2,7 +2,7 @@
  * RoseChart —— 南丁格尔玫瑰图（极区图）
  */
 
-import { Animation, Path, Text } from '@react-viz-composer/core';
+import { Animation, Path, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

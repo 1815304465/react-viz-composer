@@ -5,8 +5,9 @@
  */
 
 import { Fragment } from 'react';
-import { Rect, Text } from '@react-viz-composer/core';
-import type { ShapeEventProps, VizEvent } from '@react-viz-composer/core';
+import { Rect, Text } from '../shapes';
+import type { ShapeEventProps } from '../shapes/events';
+import type { VizEvent } from '../engine/types';
 
 export interface LegendItem {
   /** 唯一键，事件回调带回 */

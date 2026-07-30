@@ -2,7 +2,7 @@
  * ParallelCoordinatesChart —— 平行坐标图
  */
 
-import { Animation, Path, Text, Line } from '@react-viz-composer/core';
+import { Animation, Path, Text, Line } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

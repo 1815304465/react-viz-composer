@@ -2,11 +2,11 @@
  * PercentStackedBarChart —— 百分比堆叠柱状图
  */
 
-import { Animation, Rect, Text } from '@react-viz-composer/core';
+import { Animation, Rect, Text } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

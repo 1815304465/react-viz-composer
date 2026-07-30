@@ -2,11 +2,11 @@
  * SingleAxisScatterChart —— 单轴散点图
  */
 
-import { Animation, Ellipse } from '@react-viz-composer/core';
+import { Animation, Ellipse } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

@@ -2,7 +2,7 @@
  * TreeChart —— 树图（横向 tidy-tree）
  */
 
-import { Animation, Rect, Path, Text } from '@react-viz-composer/core';
+import { Animation, Rect, Path, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_HEIGHT,

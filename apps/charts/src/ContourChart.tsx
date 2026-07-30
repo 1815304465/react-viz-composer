@@ -2,7 +2,7 @@
  * ContourChart —— 等值线图
  */
 
-import { Animation, Path, Text } from '@react-viz-composer/core';
+import { Animation, Path, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

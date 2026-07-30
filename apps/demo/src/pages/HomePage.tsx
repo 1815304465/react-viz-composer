@@ -16,7 +16,7 @@ import {
 } from '@ant-design/icons';
 import { CodeBlock } from '../components/CodeBlock';
 
-const QUICK_START_CODE = `import { ReactVizComposer, Rect, Text } from '@react-viz-composer/core';
+const QUICK_START_CODE = `import { ReactVizComposer, Rect, Text } from 'react-viz-composer';
 
 export default function HelloViz() {
   return (
@@ -175,13 +175,12 @@ export function HomePage({ onNavigate }: HomePageProps) {
           <div style={{ marginTop: 32 }}>
             <QuickStartSection
               title="安装"
-              content={`npm install @react-viz-composer/core @react-viz-composer/kit`}
+              content={`npm install react-viz-composer`}
               lang="bash"
             />
             <QuickStartSection
               title="使用半成品坐标轴"
-              content={`import { ReactVizComposer, Rect } from '@react-viz-composer/core';
-import { Axis, Grid } from '@react-viz-composer/kit';
+              content={`import { ReactVizComposer, Rect, Axis, Grid } from 'react-viz-composer';
 
 export function MyBarChart() {
   return (
@@ -200,7 +199,7 @@ export function MyBarChart() {
             />
             <QuickStartSection
               title="添加动画"
-              content={`import { Animation, Rect } from '@react-viz-composer/core';
+              content={`import { Animation, Rect } from 'react-viz-composer';
 
 <Animation playbook={[
   { attribute: 'width', from: 0, duration: 600,

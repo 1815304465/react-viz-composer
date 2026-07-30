@@ -14,12 +14,10 @@
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0",
-    "@react-viz-composer/core": "^0.1.0",
-    "@react-viz-composer/kit": "^0.1.0"
+    "react-viz-composer": "^0.1.0"
   },
   "devDependencies": {
-    "@react-viz-composer/core": "^0.1.0",
-    "@react-viz-composer/kit": "^0.1.0",
+    "react-viz-composer": "^0.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "typescript": "~6.0.2"

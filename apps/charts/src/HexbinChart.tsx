@@ -3,8 +3,8 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Path, Text } from '@react-viz-composer/core';
-import { Axis, Grid } from '@react-viz-composer/kit';
+import { Animation, Path, Text } from 'react-viz-composer';
+import { Axis, Grid } from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

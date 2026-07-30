@@ -2,7 +2,7 @@
  * PolarBarChart —— 极坐标柱状图
  */
 
-import { Animation, Path, Text } from '@react-viz-composer/core';
+import { Animation, Path, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

@@ -13,8 +13,8 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import ReactVizComposer, { Group as VizGroup } from '@react-viz-composer/core';
-import type { EngineType } from '@react-viz-composer/core';
+import ReactVizComposer, { Group as VizGroup } from 'react-viz-composer';
+import type { EngineType } from 'react-viz-composer';
 import { GRID_COLOR } from '../utils/palette';
 
 export const PADDING = { top: 20, right: 20, bottom: 40, left: 50 } as const;

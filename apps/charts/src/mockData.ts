@@ -1,6 +1,6 @@
 /** 模拟数据：12 个图表各一份 */
 
-import type { Point } from '@react-viz-composer/core';
+import type { Point } from 'react-viz-composer';
 
 /* ==================== 基础三件套 ==================== */
 

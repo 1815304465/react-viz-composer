@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 // 从 shapes 层间接引用引擎类型（charts 不越过 shapes 触及 engine 内部）
-import type { VizEvent } from '@react-viz-composer/core';
+import type { VizEvent } from 'react-viz-composer';
 
 /** 由 App 层传入的 hover 回调（图表本身不包含 Tooltip UI） */
 export interface ChartItemHoverProps<T = unknown> {

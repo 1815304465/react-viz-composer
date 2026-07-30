@@ -4,8 +4,8 @@
  * 纯展示；高亮逻辑由开发者根据图表事件传入 cx/cy/visible。
  */
 
-import { Ellipse, Text } from '@react-viz-composer/core';
-import type { ShapeEventProps } from '@react-viz-composer/core';
+import { Ellipse, Text } from '../shapes';
+import type { ShapeEventProps } from '../shapes/events';
 
 export interface MarkPointProps extends ShapeEventProps {
   cx: number;

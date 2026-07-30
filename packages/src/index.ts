@@ -1,7 +1,7 @@
 /**
  * react-viz-composer —— 声明式 SVG/Canvas 混合渲染引擎
  *
- * 入口文件：导出根组件、所有形状组件、类型、引擎和 Context hooks
+ * 入口：根组件、形状、引擎、Context hooks，以及半成品工具组件（components/）
  */
 
 // 根组件
@@ -27,6 +27,34 @@ export { Mask } from './shapes/containers/Mask';
 // 容器组件
 export { Group } from './shapes/containers/Group';
 export { Animation } from './shapes/containers/Animation';
+
+// 半成品工具组件（原 kit）
+export {
+  Axis,
+  Grid,
+  Tooltip,
+  Legend,
+  MarkLine,
+  MarkPoint,
+  MarkArea,
+  Crosshair,
+  Brush,
+} from './components';
+export type {
+  AxisProps,
+  AxisScale,
+  BandScaleLike,
+  LinearScaleLike,
+  GridProps,
+  TooltipProps,
+  LegendProps,
+  LegendItem,
+  MarkLineProps,
+  MarkPointProps,
+  MarkAreaProps,
+  CrosshairProps,
+  BrushProps,
+} from './components';
 
 // 通用类型
 export type {

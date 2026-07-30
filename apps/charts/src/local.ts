@@ -1,5 +1,5 @@
 ﻿/**
- * apps/charts 本地构图辅助（示例专用，不随 @react-viz-composer/kit 发布）
+ * apps/charts 本地构图辅助（示例专用，不随 react-viz-composer 发布）
  */
 
 export { scaleLinear, scaleBand } from './utils/scales';

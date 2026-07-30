@@ -5,7 +5,7 @@
  */
 
 import { Fragment } from 'react';
-import { Line, Text } from '@react-viz-composer/core';
+import { Line, Text } from '../shapes';
 
 /** band scale 最小约定 */
 export interface BandScaleLike {

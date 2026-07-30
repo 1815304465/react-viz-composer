@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Ellipse, Text } from '@react-viz-composer/core';
+import { Animation, Ellipse, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

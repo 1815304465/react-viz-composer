@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Line, Ellipse, Text } from '@react-viz-composer/core';
+import { Animation, Line, Ellipse, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

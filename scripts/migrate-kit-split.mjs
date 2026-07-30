@@ -1,5 +1,5 @@
 /**
- * 将 apps/charts 对 @react-viz-composer/kit 的旧导入拆到 kit(Axis/Grid) + ./local
+ * 将 apps/charts 对 react-viz-composer 的旧导入拆到 kit(Axis/Grid) + ./local
  * 并为 Axis/Grid 补齐 length / crossAt。
  */
 import fs from 'node:fs';
@@ -69,10 +69,10 @@ function rewriteImports(file, content) {
 
   const blocks = [];
   if (kit.length) {
-    blocks.push(`import {\n  ${kit.join(',\n  ')},\n} from '@react-viz-composer/kit';`);
+    blocks.push(`import {\n  ${kit.join(',\n  ')},\n} from 'react-viz-composer';`);
   }
   if (kitTypes.length) {
-    blocks.push(`import type {\n  ${kitTypes.join(',\n  ')},\n} from '@react-viz-composer/kit';`);
+    blocks.push(`import type {\n  ${kitTypes.join(',\n  ')},\n} from 'react-viz-composer';`);
   }
   if (local.length) {
     blocks.push(`import {\n  ${local.join(',\n  ')},\n} from './local';`);
@@ -183,7 +183,7 @@ for (const file of files) {
   }
   const full = path.join(DIR, file);
   let content = fs.readFileSync(full, 'utf8');
-  if (!content.includes('@react-viz-composer/kit')) continue;
+  if (!content.includes('react-viz-composer')) continue;
 
   content = rewriteImports(file, content);
   content = patchAxisGridUsage(content);

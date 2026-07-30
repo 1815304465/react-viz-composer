@@ -2,7 +2,7 @@
  * HeatmapChart —— 热力图
  */
 
-import { Animation, Rect, Text } from '@react-viz-composer/core';
+import { Animation, Rect, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

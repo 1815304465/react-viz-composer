@@ -2,7 +2,7 @@
  * FunnelChart —— 漏斗图
  */
 
-import { Animation, Path, Text } from '@react-viz-composer/core';
+import { Animation, Path, Text } from 'react-viz-composer';
 import {
   ChartFrame,
   useChartItemHover,

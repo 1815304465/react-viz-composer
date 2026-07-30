@@ -5,11 +5,11 @@
  */
 
 import { useMemo } from 'react';
-import { Animation, Ellipse, Text, RadialGradient } from '@react-viz-composer/core';
+import { Animation, Ellipse, Text, RadialGradient } from 'react-viz-composer';
 import {
   Axis,
   Grid,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,

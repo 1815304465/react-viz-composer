@@ -2,10 +2,10 @@
  * GanttChart —— 甘特图
  */
 
-import { Animation, Rect, Text, Line } from '@react-viz-composer/core';
+import { Animation, Rect, Text, Line } from 'react-viz-composer';
 import {
   Axis,
-} from '@react-viz-composer/kit';
+} from 'react-viz-composer';
 import {
   ChartFrame,
   PLOT_WIDTH,
