@@ -1,22 +1,20 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: #595959;
+  --text-h: #141414;
   --bg: #fff;
   --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
+  --code-bg: #f5f5f5;
+  --accent: #1677ff;
+  --accent-bg: rgba(22, 119, 255, 0.1);
+  --accent-border: rgba(22, 119, 255, 0.3);
   --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --shadow: rgba(0, 0, 0, 0.08) 0 4px 16px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
+  font: 16px/1.6 var(--sans);
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -24,10 +22,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -37,16 +31,11 @@
     --bg: #16171d;
     --border: #2e303a;
     --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
+    --accent: #1677ff;
+    --accent-bg: rgba(22, 119, 255, 0.15);
+    --accent-border: rgba(22, 119, 255, 0.3);
     --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+    --shadow: rgba(0, 0, 0, 0.3) 0 4px 16px;
   }
 }
 
@@ -63,50 +52,135 @@ body {
   margin: 0;
 }
 
-h1,
-h2 {
+h1, h2, h3, h4 {
   font-family: var(--heading);
-  font-weight: 500;
   color: var(--text-h);
 }
 
 h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+  font-size: 48px;
+  letter-spacing: -1px;
+  margin: 0;
 }
 
 h2 {
   font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
   margin: 0 0 8px;
-
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
 }
 
 p {
   margin: 0;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+a {
+  color: var(--accent);
+  text-decoration: none;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
+a:hover {
+  text-decoration: underline;
+}
+
+/* Reset antd overrides */
+.ant-layout {
+  background: var(--bg) !important;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Code inline */
+p > code,
+li > code,
+td > code {
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 3px;
   background: var(--code-bg);
+  color: #d4380d;
+}
+
+/* Remove default counter styles */
+.counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+  margin-bottom: 24px;
+}
+
+.counter:hover {
+  border-color: var(--accent-border);
+}
+
+.counter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ─── 搜索框无边框 ─── */
+.header-search .ant-input-affix-wrapper {
+  border: none !important;
+  box-shadow: none !important;
+  background: #f5f5f5 !important;
+  border-radius: 6px !important;
+  height: 32px !important;
+  padding: 0 8px !important;
+}
+
+.header-search .ant-input-affix-wrapper:hover {
+  background: #eee !important;
+}
+
+.header-search .ant-input-affix-wrapper-focused {
+  background: #fff !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15) !important;
+}
+
+/* ─── Segmented 选中态：蓝色 bg + 白色文字 ─── */
+.ant-segmented .ant-segmented-item-selected {
+  background: #1677ff !important;
+  color: #fff !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .anticon {
+  color: #fff !important;
+}
+
+/* ─── Segmented thumb 底色：淡蓝色 ─── */
+.ant-segmented .ant-segmented-thumb {
+  background: #1677ff !important;
+}
+
+/* Segmented disabled 项保持可读 */
+.ant-segmented .ant-segmented-item-disabled .ant-segmented-item-label {
+  color: #bfbfbf !important;
+}
+
+.ant-segmented .ant-segmented-item-disabled.ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+/* Override antd Segmented selected style */
+.ant-segmented .ant-segmented-item-selected {
+  background: #1677ff !important;
+  color: #fff !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.ant-segmented .ant-segmented-item-selected .anticon {
+  color: #fff !important;
 }
