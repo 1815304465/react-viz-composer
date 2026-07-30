@@ -4,6 +4,9 @@
   "description": "Declarative SVG/Canvas hybrid rendering engine. Compose visualizations from Rect, Ellipse, Line, Path, Text, Image, Group, Animation primitives, plus Axis/Grid/Tooltip helpers.",
   "license": "MIT",
   "author": "tycho",
+  "engines": {
+    "node": ">=18"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/1815304465/react-viz-composer",
@@ -17,13 +20,17 @@
     "react",
     "visualization",
     "chart",
+    "charts",
+    "react-charts",
+    "data-visualization",
     "svg",
     "canvas",
     "declarative",
     "renderer",
     "2d",
     "dataviz",
-    "graph"
+    "graph",
+    "react-components"
   ],
   "type": "module",
   "main": "./dist/index.cjs",
@@ -32,7 +39,6 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "development": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
