@@ -270,10 +270,12 @@ class CanvasRenderer extends Renderer {
     // 效果容器：在子树绘制期间保持 clip / filter / mask（帧对象可重入嵌套）
     if (isEffectContainer) {
       this.ctx.save();
+      // 先记下视口/DPR 变换；clip 需在 worldMatrix 下建立，之后必须恢复此变换，
+      // 不能 setTransform(identity)，否则子节点会丢掉 DPR 缩放，裁剪错位。
+      const baseTransform = this.ctx.getTransform();
       this.applyMat3(this.ctx, node.worldMatrix);
       const effectFrame = this.beginContainerEffect(node);
-      // 矩阵已体现在 clip 区域；重置变换后由子节点各自 apply worldMatrix
-      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+      this.ctx.setTransform(baseTransform);
 
       const sortedChildren = sortByPaintOrder(node.children.filter((c) => !c.removed));
       for (const child of sortedChildren) {

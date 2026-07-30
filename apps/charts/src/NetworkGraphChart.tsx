@@ -1,5 +1,7 @@
 ﻿/**
- * NetworkGraphChart —— 网络图
+ * NetworkGraphChart —— 网络图 / 力导向图
+ *
+ * 节点坐标会按实测 plot 尺寸等比缩放到绘图区内，避免固定像素布局被裁切。
  */
 
 import { useMemo } from 'react';
@@ -42,6 +44,7 @@ interface Props extends ChartItemHoverProps<NodeHoverPayload> {
 }
 
 const NODE_R = 14;
+const LAYOUT_PAD = 28;
 
 const NODE_PLAYBOOK = [
   { attribute: 'rx', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 50 },
@@ -51,6 +54,50 @@ const NODE_PLAYBOOK = [
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 50, delay: 300 },
 ] as const;
+
+/**
+ * 将节点包围盒等比映射到绘图区（留边距）
+ * @param nodes 原始坐标节点
+ * @param plotWidth 绘图宽
+ * @param plotHeight 绘图高
+ */
+function fitNodesToPlot(
+  nodes: NetworkNode[],
+  plotWidth: number,
+  plotHeight: number,
+): Map<string, { x: number; y: number }> {
+  const map = new Map<string, { x: number; y: number }>();
+  if (nodes.length === 0) return map;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const n of nodes) {
+    minX = Math.min(minX, n.x);
+    maxX = Math.max(maxX, n.x);
+    minY = Math.min(minY, n.y);
+    maxY = Math.max(maxY, n.y);
+  }
+
+  const spanX = Math.max(maxX - minX, 1);
+  const spanY = Math.max(maxY - minY, 1);
+  const innerW = Math.max(plotWidth - LAYOUT_PAD * 2, 1);
+  const innerH = Math.max(plotHeight - LAYOUT_PAD * 2 - 16, 1);
+  const scale = Math.min(innerW / spanX, innerH / spanY);
+  const usedW = spanX * scale;
+  const usedH = spanY * scale;
+  const ox = LAYOUT_PAD + (innerW - usedW) / 2;
+  const oy = LAYOUT_PAD + (innerH - usedH) / 2;
+
+  for (const n of nodes) {
+    map.set(n.id, {
+      x: ox + (n.x - minX) * scale,
+      y: oy + (n.y - minY) * scale,
+    });
+  }
+  return map;
+}
 
 /**
  * 网络图
@@ -98,11 +145,10 @@ function NetworkGraphChartPlot(props: Props) {
     { source: 'Lit', target: 'Svelte' },
   ];
 
-  const positions = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    rawNodes.forEach((n) => map.set(n.id, { x: n.x, y: n.y }));
-    return map;
-  }, [rawNodes]);
+  const positions = useMemo(
+    () => fitNodesToPlot(rawNodes, plotWidth, plotHeight),
+    [rawNodes, plotWidth, plotHeight],
+  );
 
   const degree = useMemo(() => {
     const map = new Map<string, number>();
@@ -141,7 +187,7 @@ function NetworkGraphChartPlot(props: Props) {
               points={[{ x: sp.x, y: sp.y }, { x: tp.x, y: tp.y }]}
               stroke="#cccccc"
               strokeWidth={1}
-              opacity={0.6}
+              opacity={0}
             />
           </Animation>
         );

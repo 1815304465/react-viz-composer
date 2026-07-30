@@ -10,8 +10,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleLinear,
@@ -44,8 +42,12 @@ interface Props extends ChartItemHoverProps<BoxplotItem> {
 
 /**
  * 构建箱线图列动画 playbook
+ * @param item 箱线数据
+ * @param cx 列中心 x
+ * @param yScale y 比例尺
+ * @param plotHeight 实测绘图区高度
  */
-function buildBoxPlaybook(item: BoxplotItem, cx: number, yScale: LinearScale) {
+function buildBoxPlaybook(item: BoxplotItem, cx: number, yScale: LinearScale, plotHeight: number) {
   const minY = yScale(item.min);
   const q1Y = yScale(item.q1);
   const q3Y = yScale(item.q3);
@@ -59,8 +61,8 @@ function buildBoxPlaybook(item: BoxplotItem, cx: number, yScale: LinearScale) {
       targets: 'minLine',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx, y: PLOT_HEIGHT + (minY - PLOT_HEIGHT) * progress },
-          { x: cx, y: PLOT_HEIGHT + (q1Y - PLOT_HEIGHT) * progress },
+          { x: cx, y: plotHeight + (minY - plotHeight) * progress },
+          { x: cx, y: plotHeight + (q1Y - plotHeight) * progress },
         ],
       }),
     },
@@ -70,21 +72,21 @@ function buildBoxPlaybook(item: BoxplotItem, cx: number, yScale: LinearScale) {
       targets: 'maxLine',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx, y: PLOT_HEIGHT + (q3Y - PLOT_HEIGHT) * progress },
-          { x: cx, y: PLOT_HEIGHT + (maxY - PLOT_HEIGHT) * progress },
+          { x: cx, y: plotHeight + (q3Y - plotHeight) * progress },
+          { x: cx, y: plotHeight + (maxY - plotHeight) * progress },
         ],
       }),
     },
     { attribute: 'height' as const, from: 0, duration: 600, easing: 'easeOutCubic' as const, targets: 'box' },
-    { attribute: 'y' as const, from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic' as const, targets: 'box' },
+    { attribute: 'y' as const, from: plotHeight, duration: 600, easing: 'easeOutCubic' as const, targets: 'box' },
     {
       duration: 600,
       easing: 'easeOutCubic' as const,
       targets: 'medLine',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx - 0, y: PLOT_HEIGHT + (medY - PLOT_HEIGHT) * progress },
-          { x: cx + 0, y: PLOT_HEIGHT + (medY - PLOT_HEIGHT) * progress },
+          { x: cx - 0, y: plotHeight + (medY - plotHeight) * progress },
+          { x: cx + 0, y: plotHeight + (medY - plotHeight) * progress },
         ],
       }),
     },
@@ -143,7 +145,7 @@ function BoxplotChartPlot(props: Props) {
         const q3Y = yScale(d.q3);
         const boxH = Math.abs(q3Y - q1Y);
         return (
-          <Animation key={d.category} playbook={buildBoxPlaybook(d, cx, yScale)}>
+          <Animation key={d.category} playbook={buildBoxPlaybook(d, cx, yScale, plotHeight)}>
             <Group>
               <Line
                 id="minLine"

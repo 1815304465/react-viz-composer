@@ -1,5 +1,5 @@
 /**
- * ChartDemos —— App 层图表演示（Hover + 入场动画由图表 progress 驱动）
+ * ChartDemos —— App 层图表演示（Hover + 可选实时模拟数据压测）
  */
 
 import { useMemo } from 'react';
@@ -16,6 +16,12 @@ import {
   DensityCloudChart, ContourChart, CurvatureCombChart, HorizontalBarChart,
   StackedBarChart, StackedAreaChart, StepLineChart, SmoothLineChart,
   DoughnutChart, SingleAxisScatterChart, BidirectionalBarChart,
+  PercentStackedBarChart, PercentStackedAreaChart, RangeAreaChart,
+  NestedPieChart, DualAxisChart, LollipopChart, DumbbellChart, SlopeChart,
+  BulletChart, PopulationPyramidChart, ParetoChart, ViolinChart,
+  RidgelineChart, HexbinChart, WaffleChart, ProgressRingChart, IcicleChart,
+  CirclePackingChart, ArcDiagramChart, DendrogramChart, RadialTreeChart,
+  AdjacencyMatrixChart, FlightLinesChart,
 } from '@react-viz-composer/charts';
 import {
   barData, lineData, lineCategories, scatterData,
@@ -36,74 +42,102 @@ import {
   doughnutData, singleAxisScatterData, bidirectionalBarData,
 } from '@react-viz-composer/charts/mockData';
 import { forceLayout } from './forceLayout';
+import {
+  useLiveData,
+  jitterValueItems,
+  scrollSeries,
+  jitterSeries,
+  jitterScatterPoints,
+  jitterRadarData,
+  advanceKline,
+  jitterHeatmap,
+  jitterCombo,
+  jitterBubbles,
+  jitterHistogram,
+  jitterBoxplot,
+  jitterErrorBars,
+  oscillateScalar,
+  jitterWordCloud,
+  jitterBidirectional,
+  jitterSingleAxis,
+  jitterParallelRows,
+  jitterThemeRiver,
+} from '../live';
 
-/* ==================== 原有 Demo（不变） ==================== */
+/* ==================== 原有 Demo ==================== */
 
 export function BarChartDemo() {
+  const data = useLiveData(barData, (prev) => jitterValueItems(prev, 22));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <BarChart data={barData} onItemEnter={(d, evt) => show(`${d.month}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+        <BarChart data={data} onItemEnter={(d, evt) => show(`${d.month}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function LineChartDemo() {
+  const data = useLiveData(lineData, (prev) => scrollSeries(prev, 22));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <LineChart data={lineData} categories={lineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <LineChart data={data} categories={lineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function ScatterChartDemo() {
+  const data = useLiveData(scatterData, (prev) => jitterScatterPoints(prev, 2.2));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <ScatterChart data={scatterData} onItemEnter={(p, evt) => show(`聚类 ${p.group + 1}\nx: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}`, evt)} onItemLeave={hide} />
+        <ScatterChart data={data} onItemEnter={(p, evt) => show(`聚类 ${p.group + 1}\nx: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function AreaChartDemo() {
+  const data = useLiveData(areaData, (prev) => scrollSeries(prev, 20));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <AreaChart data={areaData} categories={areaCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <AreaChart data={data} categories={areaCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function PieChartDemo() {
+  const data = useLiveData(pieData, (prev) => jitterValueItems(prev, 28, 20));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <PieChart data={pieData} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}\n占比: ${d.percent}%`, evt)} onItemLeave={hide} />
+        <PieChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}\n占比: ${d.percent}%`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function RadarChartDemo() {
+  const live = useLiveData(radarData, jitterRadarData);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <RadarChart indicator={radarData.indicator} series={radarData.series} onItemEnter={(d, evt) => show(`${d.series}\n${d.indicator}: ${d.value}`, evt)} onItemLeave={hide} />
+        <RadarChart indicator={live.indicator} series={live.series} onItemEnter={(d, evt) => show(`${d.series}\n${d.indicator}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function CandlestickChartDemo() {
+  const data = useLiveData(klineData, advanceKline);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <CandlestickChart data={klineData} onItemEnter={(d, evt) => show(`日期: ${d.date}\n开: ${d.open} 收: ${d.close}\n高: ${d.high} 低: ${d.low}`, evt)} onItemLeave={hide} />
+        <CandlestickChart data={data} onItemEnter={(d, evt) => show(`日期: ${d.date}\n开: ${d.open} 收: ${d.close}\n高: ${d.high} 低: ${d.low}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
@@ -120,20 +154,22 @@ export function GanttChartDemo() {
 }
 
 export function HeatmapChartDemo() {
+  const data = useLiveData(heatmapData, (prev) => jitterHeatmap(prev, 0.1));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <HeatmapChart cols={heatmapCols} rows={heatmapRows} data={heatmapData} onItemEnter={(d, evt) => show(`${d.row} · ${d.col}\n强度: ${d.value.toFixed(2)}`, evt)} onItemLeave={hide} />
+        <HeatmapChart cols={heatmapCols} rows={heatmapRows} data={data} onItemEnter={(d, evt) => show(`${d.row} · ${d.col}\n强度: ${d.value.toFixed(2)}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function FunnelChartDemo() {
+  const data = useLiveData(funnelData, (prev) => jitterValueItems(prev, 20, 10));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <FunnelChart data={funnelData} onItemEnter={(d, evt) => show(`${d.name}\n数量: ${d.value}`, evt)} onItemLeave={hide} />
+        <FunnelChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数量: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
@@ -160,20 +196,22 @@ export function TreeChartDemo() {
 }
 
 export function ComboChartDemo() {
+  const data = useLiveData(comboData, jitterCombo);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <ComboChart data={comboData} onItemEnter={(d, evt) => show(`${d.month}\n销量: ${d.sales}\n增长率: ${d.rate}%`, evt)} onItemLeave={hide} />
+        <ComboChart data={data} onItemEnter={(d, evt) => show(`${d.month}\n销量: ${d.sales}\n增长率: ${d.rate}%`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function BubbleChartDemo() {
+  const data = useLiveData(bubbleData, jitterBubbles);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <BubbleChart data={bubbleData} onItemEnter={(d, evt) => show(`${d.name}\nGMV 指数: ${d.x} / ${d.y}\n规模: ${d.size}`, evt)} onItemLeave={hide} />
+        <BubbleChart data={data} onItemEnter={(d, evt) => show(`${d.name}\nGMV 指数: ${d.x} / ${d.y}\n规模: ${d.size}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
@@ -184,40 +222,50 @@ export function ExplorableScatterDemo() {
 }
 
 export function WaterfallChartDemo() {
+  const data = useLiveData(waterfallData, (prev) =>
+    prev.map((d, i) => (i === 0 || i === prev.length - 1
+      ? d
+      : { ...d, value: d.value >= 0
+        ? Math.max(5, d.value + (Math.random() - 0.5) * 24)
+        : Math.min(-5, d.value + (Math.random() - 0.5) * 24) })),
+  );
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <WaterfallChart data={waterfallData} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+        <WaterfallChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function HistogramChartDemo() {
+  const data = useLiveData(histogramData, jitterHistogram);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <HistogramChart data={histogramData} onItemEnter={(d, evt) => show(`${d.bin}\n频次: ${d.count}`, evt)} onItemLeave={hide} />
+        <HistogramChart data={data} onItemEnter={(d, evt) => show(`${d.bin}\n频次: ${d.count}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function BoxplotChartDemo() {
+  const data = useLiveData(boxplotData, jitterBoxplot);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <BoxplotChart data={boxplotData} onItemEnter={(d, evt) => show(`${d.category}\n最小: ${d.min}\nQ1: ${d.q1}\n中位数: ${d.median}\nQ3: ${d.q3}\n最大: ${d.max}`, evt)} onItemLeave={hide} />
+        <BoxplotChart data={data} onItemEnter={(d, evt) => show(`${d.category}\n最小: ${d.min}\nQ1: ${d.q1}\n中位数: ${d.median}\nQ3: ${d.q3}\n最大: ${d.max}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function RoseChartDemo() {
+  const data = useLiveData(roseData, (prev) => jitterValueItems(prev, 18, 10));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <RoseChart data={roseData} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+        <RoseChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
@@ -234,21 +282,25 @@ export function TreemapChartDemo() {
 }
 
 export function ErrorBarChartDemo() {
+  const data = useLiveData(errorBarData, jitterErrorBars);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <ErrorBarChart data={errorBarData} onItemEnter={(d, evt) => show(`${d.category}\n数值: ${d.value} ± ${d.error}`, evt)} onItemLeave={hide} />
+        <ErrorBarChart data={data} onItemEnter={(d, evt) => show(`${d.category}\n数值: ${d.value} ± ${d.error}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function GaugeChartDemo() {
+  const value = useLiveData(gaugeValue, (prev) =>
+    oscillateScalar(prev, gaugeBaseConfig.min, gaugeBaseConfig.max, 6),
+  );
   return (
     <GaugeChart
       min={gaugeBaseConfig.min}
       max={gaugeBaseConfig.max}
-      value={gaugeValue}
+      value={value}
       title="完成率"
     />
   );
@@ -258,7 +310,7 @@ export function CalendarHeatmapChartDemo() {
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <CalendarHeatmapChart data={[]} onItemEnter={(d, evt) => show(`${d.date}\n值: ${d.value}`, evt)} onItemLeave={hide} />
+        <CalendarHeatmapChart onItemEnter={(d, evt) => show(`${d.date}\n值: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
@@ -277,12 +329,13 @@ export function TimelineChartDemo() {
 /* ==================== 新增图表 Demo（batch 1 + batch 2） ==================== */
 
 export function ParallelCoordinatesChartDemo() {
+  const live = useLiveData(parallelCoordinatesData, jitterParallelRows);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
         <ParallelCoordinatesChart
-          axes={parallelCoordinatesData.axes}
-          data={parallelCoordinatesData.data}
+          axes={live.axes}
+          data={live.data}
           onItemEnter={(d, evt) => show(`第${d.row + 1}行\n${d.axes.map((a: string, i: number) => `${a}: ${d.values[i]}`).join('\n')}`, evt)}
           onItemLeave={hide}
         />
@@ -307,11 +360,12 @@ export function ChordChartDemo() {
 }
 
 export function EffectScatterChartDemo() {
+  const data = useLiveData(effectScatterData, (prev) => jitterScatterPoints(prev, 2));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
         <EffectScatterChart
-          data={effectScatterData}
+          data={data}
           onItemEnter={(p, evt) => show(`聚类 ${p.group + 1}\nx: ${p.x.toFixed(1)}\ny: ${p.y.toFixed(1)}`, evt)}
           onItemLeave={hide}
         />
@@ -321,11 +375,12 @@ export function EffectScatterChartDemo() {
 }
 
 export function PolarBarChartDemo() {
+  const data = useLiveData(polarBarData, (prev) => jitterValueItems(prev, 16, 5));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
         <PolarBarChart
-          data={polarBarData}
+          data={data}
           onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)}
           onItemLeave={hide}
         />
@@ -364,12 +419,13 @@ export function SunburstChartDemo() {
 }
 
 export function ThemeRiverChartDemo() {
+  const series = useLiveData(themeRiverData, jitterThemeRiver);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
         <ThemeRiverChart
           categories={themeRiverCategories}
-          series={themeRiverData}
+          series={series}
           onItemEnter={(d, evt) => show(`${d.name}`, evt)}
           onItemLeave={hide}
         />
@@ -393,11 +449,12 @@ export function VennChartDemo() {
 }
 
 export function WordCloudChartDemo() {
+  const data = useLiveData(wordCloudData, jitterWordCloud);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
         <WordCloudChart
-          data={wordCloudData}
+          data={data}
           onItemEnter={(d, evt) => show(`${d.text}\n权重: ${d.weight}`, evt)}
           onItemLeave={hide}
         />
@@ -407,9 +464,12 @@ export function WordCloudChartDemo() {
 }
 
 export function LiquidFillChartDemo() {
+  const value = useLiveData(liquidFillData.value, (prev) =>
+    oscillateScalar(prev, 10, liquidFillData.max ?? 100, 5),
+  );
   return (
     <LiquidFillChart
-      value={liquidFillData.value}
+      value={value}
       max={liquidFillData.max ?? 100}
     />
   );
@@ -457,86 +517,332 @@ export function ContourChartDemo() {
 }
 
 export function CurvatureCombChartDemo() {
-  return <CurvatureCombChart data={curvatureCombData} />;
+  return <CurvatureCombChart data={curvatureCombData} animate />;
 }
 
 /* ==================== 新增 8 个图表 Demo（batch 4） ==================== */
 
 export function HorizontalBarChartDemo() {
+  const data = useLiveData(horizontalBarData, (prev) => jitterValueItems(prev, 20));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <HorizontalBarChart data={horizontalBarData} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+        <HorizontalBarChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function StackedBarChartDemo() {
+  const data = useLiveData(stackedBarData, (prev) => jitterSeries(prev, 14));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <StackedBarChart data={stackedBarData} categories={stackedBarCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <StackedBarChart data={data} categories={stackedBarCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function StackedAreaChartDemo() {
+  const data = useLiveData(stackedAreaData, (prev) => scrollSeries(prev, 16));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <StackedAreaChart data={stackedAreaData} categories={stackedAreaCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <StackedAreaChart data={data} categories={stackedAreaCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function StepLineChartDemo() {
+  const data = useLiveData(stepLineData, (prev) => scrollSeries(prev, 18));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <StepLineChart data={stepLineData} categories={stepLineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <StepLineChart data={data} categories={stepLineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function SmoothLineChartDemo() {
+  const data = useLiveData(smoothLineData, (prev) => scrollSeries(prev, 18));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <SmoothLineChart data={smoothLineData} categories={smoothLineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
+        <SmoothLineChart data={data} categories={smoothLineCategories} onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function DoughnutChartDemo() {
+  const data = useLiveData(doughnutData, (prev) => jitterValueItems(prev, 24, 20));
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <DoughnutChart data={doughnutData} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}\n占比: ${d.percent}%`, evt)} onItemLeave={hide} />
+        <DoughnutChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}\n占比: ${d.percent}%`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function SingleAxisScatterChartDemo() {
+  const data = useLiveData(singleAxisScatterData, jitterSingleAxis);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <SingleAxisScatterChart data={singleAxisScatterData} onItemEnter={(p, evt) => show(`值: ${p.value}\n尺寸: ${p.size}\n聚类: ${p.group + 1}`, evt)} onItemLeave={hide} />
+        <SingleAxisScatterChart data={data} onItemEnter={(p, evt) => show(`值: ${p.value}\n尺寸: ${p.size}\n聚类: ${p.group + 1}`, evt)} onItemLeave={hide} />
       )}
     </ChartHoverShell>
   );
 }
 
 export function BidirectionalBarChartDemo() {
+  const data = useLiveData(bidirectionalBarData, jitterBidirectional);
   return (
     <ChartHoverShell>
       {({ show, hide }) => (
-        <BidirectionalBarChart data={bidirectionalBarData} onItemEnter={(d, evt) => show(`${d.name}\n${d.direction === 'positive' ? '正向: ' : '负向: '}${d.value}`, evt)} onItemLeave={hide} />
+        <BidirectionalBarChart data={data} onItemEnter={(d, evt) => show(`${d.name}\n${d.direction === 'positive' ? '正向: ' : '负向: '}${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+/* ==================== 新增二维图表 Demo ==================== */
+
+export function PercentStackedBarChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <PercentStackedBarChart onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}%`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function PercentStackedAreaChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <PercentStackedAreaChart onItemEnter={(d, evt) => show(`${d.series}\n${d.category}: ${d.value}%`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function RangeAreaChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <RangeAreaChart onItemEnter={(d, evt) => show(`${d.name}\n${d.low} ~ ${d.high}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function NestedPieChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <NestedPieChart onItemEnter={(d, evt) => show(`${d.ring}: ${d.name}\n数值: ${d.value}\n占比: ${d.percent}%`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function DualAxisChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <DualAxisChart onItemEnter={(d, evt) => show(`${d.category}\n柱: ${d.bar}\n线: ${d.line}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function LollipopChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <LollipopChart onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function DumbbellChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <DumbbellChart onItemEnter={(d, evt) => show(`${d.name}\n${d.start} → ${d.end}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function SlopeChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <SlopeChart onItemEnter={(d, evt) => show(`${d.name}\n${d.left} → ${d.right}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function BulletChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <BulletChart onItemEnter={(d, evt) => show(`${d.name}\n实际: ${d.value}\n目标: ${d.target}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function PopulationPyramidChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <PopulationPyramidChart onItemEnter={(d, evt) => show(`${d.age}\n${d.gender === 'male' ? '男' : '女'}: ${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function ParetoChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <ParetoChart onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function ViolinChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <ViolinChart onItemEnter={(d, evt) => show(`${d.name}\n中位数: ${d.median}\nn=${d.count}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function RidgelineChartDemo() {
+  return <RidgelineChart />;
+}
+
+export function HexbinChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <HexbinChart onItemEnter={(d, evt) => show(`计数: ${d.count}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function WaffleChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <WaffleChart onItemEnter={(d, evt) => show(`${d.name}\n数值: ${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function ProgressRingChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <ProgressRingChart onItemEnter={(d, evt) => show(`${d.name}\n${d.value}/${d.max} (${d.percent}%)`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function IcicleChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <IcicleChart onItemEnter={(d, evt) => show(`${d.name}\n深度: ${d.depth}\n${d.value ?? ''}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function CirclePackingChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <CirclePackingChart onItemEnter={(d, evt) => show(`${d.name}\n深度: ${d.depth}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function ArcDiagramChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <ArcDiagramChart
+          onItemEnter={(d, evt) => {
+            const text = 'id' in d ? `${d.id}\n度数: ${d.degree}` : `${d.source} → ${d.target}\n${d.value}`;
+            show(text, evt);
+          }}
+          onItemLeave={hide}
+        />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function DendrogramChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <DendrogramChart onItemEnter={(d, evt) => show(`${d.name}\n深度: ${d.depth}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function RadialTreeChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <RadialTreeChart onItemEnter={(d, evt) => show(`${d.name}\n深度: ${d.depth}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function AdjacencyMatrixChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <AdjacencyMatrixChart onItemEnter={(d, evt) => show(`${d.row} → ${d.col}\n${d.value}`, evt)} onItemLeave={hide} />
+      )}
+    </ChartHoverShell>
+  );
+}
+
+export function FlightLinesChartDemo() {
+  return (
+    <ChartHoverShell>
+      {({ show, hide }) => (
+        <FlightLinesChart
+          onItemEnter={(d, evt) => {
+            const text = 'id' in d ? `${d.name || d.id}\n度数: ${d.degree}` : `${d.from} → ${d.to}\n${d.value}`;
+            show(text, evt);
+          }}
+          onItemLeave={hide}
+        />
       )}
     </ChartHoverShell>
   );

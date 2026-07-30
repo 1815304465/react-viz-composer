@@ -249,16 +249,33 @@ class AnimPlayer {
     });
   }
 
-  /** 开播时写入各属性轨的 from */
+  /** 开播时写入各轨初始值（属性轨 → from；compute 轨 → progress 0） */
   private applyTrackStarts(): void {
     const batch = new Map<string, Record<string, unknown>>();
+    const now = performance.now();
 
     for (const tracks of this.groups) {
       for (const track of tracks) {
-        if (track.compute || track.sustain) continue;
-        if (track.attribute == null) continue;
+        if (track.sustain) continue;
         const node = this.host.getNode(track.targetId);
         if (!node) continue;
+
+        if (track.compute) {
+          const ctx: AnimComputeContext = {
+            progress: 0,
+            elapsed: 0,
+            time: 0,
+            index: track.index,
+            targetId: track.targetId,
+            now,
+          };
+          const partial = track.compute(ctx) as Record<string, unknown>;
+          const existing = batch.get(track.targetId) ?? {};
+          batch.set(track.targetId, { ...existing, ...partial });
+          continue;
+        }
+
+        if (track.attribute == null) continue;
         const partial = batch.get(track.targetId) ?? {};
         writeAnimAttr(node.type, track.attribute, track.from, partial, node.data);
         batch.set(track.targetId, partial);
@@ -406,6 +423,10 @@ class AnimPlayer {
       this.cycle += 1;
       this.groupIndex = 0;
       this.groupStart = performance.now();
+      // 非 yoyo 正向轮：回到 from，避免循环首帧仍停在 to
+      if (this.cycle % 2 === 0 || !this.groups.some((g) => g.some((t) => t.yoyo))) {
+        this.applyTrackStarts();
+      }
       return;
     }
 

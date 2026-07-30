@@ -567,8 +567,9 @@ export interface VennSet {
   overlap: number[];
 }
 export const vennData: VennSet[] = [
-  { name: '技术', size: 60, overlap: [12] },
-  { name: '设计', size: 45, overlap: [12] },
+  { name: '技术', size: 60, overlap: [12, 8] },
+  { name: '设计', size: 45, overlap: [12, 10] },
+  { name: '产品', size: 50, overlap: [8, 10] },
 ];
 
 /* ==================== 新增图表：词云图 ==================== */
@@ -696,25 +697,72 @@ export const contourData: number[][] = (() => {
 export const contourRows: string[] = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9', 'R10', 'R11', 'R12', 'R13', 'R14', 'R15'];
 export const contourCols: string[] = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15'];
 
-/** CurvatureCombChart 曲线数据 */
-export interface CurvePoint {
+/** CurvatureCombChart 翼型轮廓点（含数值） */
+export interface CurvatureCombPoint {
   x: number;
   y: number;
+  value: number;
 }
 
-export const curvatureCombData: CurvePoint[] = (() => {
-  const points: CurvePoint[] = [];
-  const n = 80;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const x = t * 100;
-    const y =
-      50 +
-      25 * Math.sin(t * Math.PI * 3) +
-      10 * Math.sin(t * Math.PI * 7) * Math.exp(-t * 3);
-    points.push({ x, y });
+/**
+ * NACA 厚度
+ * @param x 弦向 0→1
+ * @param thickness 厚度比
+ */
+function nacaThicknessMock(x: number, thickness: number): number {
+  const xc = Math.max(0, Math.min(1, x));
+  return (
+    5 *
+    thickness *
+    (0.2969 * Math.sqrt(xc) -
+      0.1260 * xc -
+      0.3516 * xc * xc +
+      0.2843 * xc * xc * xc -
+      0.1015 * xc * xc * xc * xc)
+  );
+}
+
+/**
+ * NACA 凸轮
+ * @param x 弦向 0→1
+ * @param m 最大弯度
+ * @param p 弯度位置
+ */
+function nacaCamberMock(x: number, m: number, p: number): number {
+  if (m <= 0) return 0;
+  if (x < p) return (m / (p * p)) * (2 * p * x - x * x);
+  return (m / ((1 - p) * (1 - p))) * (1 - 2 * p + 2 * p * x - x * x);
+}
+
+/** 水平翼型曲率梳 mock（闭合轮廓，前缘在左） */
+export const curvatureCombData: CurvatureCombPoint[] = (() => {
+  const chord = 0.08;
+  const samplesPerSide = 90;
+  const m = 0.02;
+  const p = 0.4;
+  const thick = 0.12;
+  const leX = 0;
+  const leY = 0.025;
+  const upper: CurvatureCombPoint[] = [];
+  const lower: CurvatureCombPoint[] = [];
+
+  for (let i = 0; i <= samplesPerSide; i++) {
+    const t = i / samplesPerSide;
+    const xNorm = t * t;
+    const yt = nacaThicknessMock(xNorm, thick);
+    const yc = nacaCamberMock(xNorm, m, p);
+    const x = leX + xNorm * chord;
+    const yu = leY + (yc + yt) * chord;
+    const yl = leY + (yc - yt) * chord;
+    const leBoost = 1.05e5 * Math.exp(-xNorm * 9);
+    const upperMid = 5.5e4 * Math.sin(Math.PI * Math.min(1, xNorm * 1.1));
+    const lowerMid = 3.2e4 * Math.sin(Math.PI * Math.min(1, xNorm * 1.15));
+    const teDip = -1.5e4 * xNorm * xNorm;
+    upper.push({ x, y: yu, value: 1.35e6 + leBoost + upperMid + teDip });
+    lower.push({ x, y: yl, value: 1.35e6 + leBoost * 0.95 + lowerMid + teDip * 0.8 });
   }
-  return points;
+
+  return [...upper.slice().reverse(), ...lower.slice(1)];
 })();
 
 /* 工具：极坐标 → 直角坐标（用于饼图/雷达） */

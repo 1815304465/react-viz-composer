@@ -10,8 +10,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleBand,
@@ -34,10 +32,13 @@ interface Props extends ChartItemHoverProps<BarItem> {
   color?: string;
 }
 
-const BAR_PLAYBOOK = [
-  { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-  { attribute: 'y', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-] as const;
+/** 构建柱状图入场 playbook */
+function buildBarPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+    { attribute: 'y', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+  ] as const;
+}
 
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 40, delay: 200 },
@@ -83,7 +84,7 @@ function BarChartPlot(props: Props) {
   return (
     <>
       <Grid scale={yScale} orient="y"  length={plotWidth} />
-      <Animation playbook={[...BAR_PLAYBOOK]}>
+      <Animation playbook={[...buildBarPlaybook(plotHeight)]}>
         {dataset.map((d) => {
           const x = xScale(d.month);
           const fullHeight = plotHeight - yScale(d.value);

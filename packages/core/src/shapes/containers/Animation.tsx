@@ -1,6 +1,7 @@
 import {
   useRef,
   useEffect,
+  useLayoutEffect,
   useCallback,
   forwardRef,
   useImperativeHandle,
@@ -140,7 +141,6 @@ function Animation(props: Props, ref: React.Ref<AnimationHandle>) {
     enqueueJob,
   });
   const prevSnapshotRef = useRef<Record<string, unknown> | null>(null);
-  const autoPlayedRef = useRef(false);
   const watchRunningRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   const onCancelRef = useRef(onCancel);
@@ -199,7 +199,18 @@ function Animation(props: Props, ref: React.Ref<AnimationHandle>) {
    */
   const runPlaybook = useCallback(() => {
     const steps = playbookRef.current;
-    if (!steps?.length || !playerRef.current) return;
+    if (!steps?.length) return;
+
+    // Strict Mode remount 时 dispose 会清空 player，按需重建
+    if (!playerRef.current) {
+      playerRef.current = new AnimPlayer({
+        getNode: (id) => hostRef.current.getNode(id),
+        getChildIds: (id) => hostRef.current.getChildIds(id),
+        update: (id, partial) => hostRef.current.update(id, partial),
+        requestFrame: (fn) => hostRef.current.requestFrame(fn),
+        enqueueJob: (fn, priority) => hostRef.current.enqueueJob(fn, priority),
+      });
+    }
 
     watchRunningRef.current = true;
     playerRef.current.play({
@@ -249,17 +260,22 @@ function Animation(props: Props, ref: React.Ref<AnimationHandle>) {
     return unsub;
   }, [hasWatch, sceneTree, snapshotWatched, watch, runPlaybook]);
 
-  useEffect(() => {
-    if (hasWatch || !autoPlay || !playbook || playbook.length === 0 || autoPlayedRef.current) {
-      return;
-    }
-    autoPlayedRef.current = true;
-    // 延迟一帧：确保子节点已从 pending 队列 flush 进 SceneTree
-    const raf = requestAnimationFrame(() => {
-      runPlaybook();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [hasWatch, autoPlay, playbook, runPlaybook]);
+  /**
+   * mount 自动播放入场 / 持续 playbook。
+   * useLayoutEffect + 同步 play：子节点已在 layout 阶段注册，
+   * applyTrackStarts 在首帧 paint 前写入 from / progress=0，避免「先闪最终态再动画」。
+   */
+  useLayoutEffect(() => {
+    if (hasWatch || !autoPlay) return;
+    if (!playbookRef.current?.length) return;
+
+    runPlaybook();
+
+    return () => {
+      // Strict Mode 首次 cleanup：停掉播放，二次 mount 会重播入场
+      playerRef.current?.cancel(false, false);
+    };
+  }, [hasWatch, autoPlay, myId, runPlaybook]);
 
   return (
     <ParentIdContext.Provider value={myId}>

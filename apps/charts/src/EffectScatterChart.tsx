@@ -1,5 +1,7 @@
 ﻿/**
  * EffectScatterChart —— 涟漪散点图
+ *
+ * 入场：点从原点扩散出现；随后涟漪圈持续循环放大淡出（sustain）。
  */
 
 import { Fragment } from 'react';
@@ -10,8 +12,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleLinear,
@@ -33,18 +33,82 @@ interface Props extends ChartItemHoverProps<ScatterPoint> {
   data?: ScatterPoint[];
 }
 
-const rippleRings = [
-  { scale: 2.2, opacity: 0.12 },
-  { scale: 3.4, opacity: 0.07 },
-  { scale: 4.6, opacity: 0.04 },
+const RIPPLE_RINGS = [
+  { scale: 2.2, opacity: 0.18 },
+  { scale: 3.4, opacity: 0.12 },
+  { scale: 4.6, opacity: 0.08 },
 ];
 
-const RIPPLE_PLAYBOOK = [
-  { attribute: 'cx', duration: 700, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-  { attribute: 'cy', duration: 700, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-  { attribute: 'rx', from: 0, duration: 700, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-  { attribute: 'ry', from: 0, duration: 700, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-] as const;
+/** 涟漪周期（秒） */
+const RIPPLE_PERIOD = 1.6;
+
+/**
+ * 构建入场 + 持续涟漪 playbook
+ * @param originX 入场起点 x
+ * @param originY 入场起点 y
+ * @param coreIds 核心点 id
+ * @param rippleIds 涟漪圈 id
+ */
+function buildEffectPlaybook(
+  originX: number,
+  originY: number,
+  coreIds: string[],
+  rippleIds: string[],
+) {
+  return [
+    {
+      attribute: 'cx' as const,
+      from: originX,
+      duration: 700,
+      easing: 'easeOutCubic' as const,
+      targets: coreIds,
+      stagger: 25,
+      group: 0,
+    },
+    {
+      attribute: 'cy' as const,
+      from: originY,
+      duration: 700,
+      easing: 'easeOutCubic' as const,
+      targets: coreIds,
+      stagger: 25,
+      group: 0,
+    },
+    {
+      attribute: 'rx' as const,
+      from: 0,
+      duration: 700,
+      easing: 'easeOutCubic' as const,
+      targets: coreIds,
+      stagger: 25,
+      group: 0,
+    },
+    {
+      attribute: 'ry' as const,
+      from: 0,
+      duration: 700,
+      easing: 'easeOutCubic' as const,
+      targets: coreIds,
+      stagger: 25,
+      group: 0,
+    },
+    {
+      sustain: true,
+      targets: rippleIds,
+      group: 1,
+      compute: ({ time, index }: { time: number; index: number }) => {
+        const ring = RIPPLE_RINGS[index % RIPPLE_RINGS.length];
+        const phase = (index % RIPPLE_RINGS.length) * 0.22;
+        const t = ((time + phase) % RIPPLE_PERIOD) / RIPPLE_PERIOD;
+        return {
+          rx: 4 * ring.scale * t,
+          ry: 4 * ring.scale * t,
+          opacity: ring.opacity * (1 - t),
+        };
+      },
+    },
+  ];
+}
 
 /**
  * 涟漪散点图
@@ -73,15 +137,16 @@ function EffectScatterChartPlot(props: Props) {
   const originX = plotWidth / 2;
   const originY = plotHeight;
 
+  const coreIds = points.map((_, i) => `core-${i}`);
+  const rippleIds = points.flatMap((_, i) =>
+    RIPPLE_RINGS.map((_, ri) => `ripple-${i}-${ri}`),
+  );
+
   return (
     <>
-      <Grid scale={xScale} orient="x"  length={plotHeight} />
-      <Grid scale={yScale} orient="y"  length={plotWidth} />
-      <Animation playbook={RIPPLE_PLAYBOOK.map((step) => {
-        if (step.attribute === 'cx') return { ...step, from: originX };
-        if (step.attribute === 'cy') return { ...step, from: originY };
-        return step;
-      })}>
+      <Grid scale={xScale} orient="x" length={plotHeight} />
+      <Grid scale={yScale} orient="y" length={plotWidth} />
+      <Animation playbook={buildEffectPlaybook(originX, originY, coreIds, rippleIds)}>
         {points.map((p, i) => {
           const tx = xScale(p.x);
           const ty = yScale(p.y);
@@ -91,20 +156,22 @@ function EffectScatterChartPlot(props: Props) {
           const coreR = hovered ? 6 : 4;
           return (
             <Fragment key={i}>
-              {rippleRings.map((ring, ri) => (
+              {RIPPLE_RINGS.map((_, ri) => (
                 <Ellipse
                   key={`ripple-${ri}`}
+                  id={`ripple-${i}-${ri}`}
                   cx={tx}
                   cy={ty}
-                  rx={4 * ring.scale}
-                  ry={4 * ring.scale}
+                  rx={0}
+                  ry={0}
                   fill={color}
-                  opacity={ring.opacity}
+                  opacity={0}
                   stroke="none"
                   strokeWidth={0}
                 />
               ))}
               <Ellipse
+                id={`core-${i}`}
                 cx={tx}
                 cy={ty}
                 rx={coreR}
@@ -119,8 +186,8 @@ function EffectScatterChartPlot(props: Props) {
           );
         })}
       </Animation>
-      <Axis scale={xScale} orient="bottom"  length={plotWidth} crossAt={plotHeight}  />
-      <Axis scale={yScale} orient="left"  length={plotHeight} crossAt={0}  />
+      <Axis scale={xScale} orient="bottom" length={plotWidth} crossAt={plotHeight} />
+      <Axis scale={yScale} orient="left" length={plotHeight} crossAt={0} />
     </>
   );
 }

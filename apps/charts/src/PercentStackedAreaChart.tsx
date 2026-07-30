@@ -1,5 +1,5 @@
-﻿/**
- * StackedAreaChart —— 堆叠面积图
+/**
+ * PercentStackedAreaChart —— 百分比堆叠面积图
  */
 
 import { Animation, Path, Ellipse, Text } from '@react-viz-composer/core';
@@ -9,8 +9,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleBand,
@@ -25,7 +23,6 @@ import type {
 } from './local';
 
 
-
 interface Series {
   name: string;
   values: number[];
@@ -35,6 +32,7 @@ interface StackedHoverPayload {
   series: string;
   category: string;
   value: number;
+  percent: number;
 }
 
 interface Props extends ChartItemHoverProps<StackedHoverPayload> {
@@ -57,6 +55,19 @@ function buildPointPlaybook(plotHeight: number) {
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 120, delay: 300 },
 ] as const;
+
+/**
+ * 将原始值转为各类目内的百分比
+ */
+function toPercentValues(series: Series[]): number[][] {
+  const catCount = series[0]?.values.length ?? 0;
+  return series.map((s) =>
+    s.values.map((v, i) => {
+      const total = series.reduce((sum, ser) => sum + ser.values[i], 0);
+      return total > 0 ? (v / total) * 100 : 0;
+    }),
+  );
+}
 
 /**
  * 构建堆叠面积路径
@@ -99,19 +110,16 @@ function buildStackedLinePath(
   return points.map((pt, i) => `${i === 0 ? 'M' : 'L'} ${pt.x} ${pt.y}`).join(' ');
 }
 
-/**
- * 堆叠面积图
- */
-export function StackedAreaChart(props: Props) {
+export function PercentStackedAreaChart(props: Props) {
   return (
     <ChartFrame>
-      <StackedAreaChartPlot {...props} />
+      <PercentStackedAreaChartPlot {...props} />
     </ChartFrame>
   );
 }
 
 /** @param props: Props 图表 props */
-function StackedAreaChartPlot(props: Props) {
+function PercentStackedAreaChartPlot(props: Props) {
   const { plotWidth, plotHeight } = useChartSize();
 
   const { data, categories, onItemEnter, onItemLeave } = props;
@@ -127,32 +135,31 @@ function StackedAreaChartPlot(props: Props) {
   ];
   const cats = categories ?? ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7'];
 
+  const percentValues = toPercentValues(series);
   const xScale = scaleBand(cats, [0, plotWidth], 0.05);
-  const maxStacked = Math.max(
-    ...cats.map((_, i) => series.reduce((sum, s) => sum + s.values[i], 0)),
-  ) * 1.1;
-  const yScale = scaleLinear([0, maxStacked], [plotHeight, 0]);
+  const yScale = scaleLinear([0, 100], [plotHeight, 0]);
 
   return (
     <>
-      <Grid scale={yScale} orient="y"  length={plotWidth} />
+      <Grid scale={yScale} orient="y" length={plotWidth} />
       <Animation playbook={[...PATH_PLAYBOOK]}>
         {series.flatMap((s, si) => {
+          const pctVals = percentValues[si];
           const cumulativeBelow = cats.map((_, i) =>
-            series.slice(0, si).reduce((sum, prev) => sum + prev.values[i], 0),
+            percentValues.slice(0, si).reduce((sum, prev) => sum + prev[i], 0),
           );
           const color = SEMANTIC_6[si % SEMANTIC_6.length];
           return [
             <Path
               key={`area-${s.name}`}
-              d={buildStackedAreaPath(s.values, cumulativeBelow, cats, xScale, yScale)}
+              d={buildStackedAreaPath(pctVals, cumulativeBelow, cats, xScale, yScale)}
               fill={color + '50'}
               stroke="none"
               opacity={1}
             />,
             <Path
               key={`line-${s.name}`}
-              d={buildStackedLinePath(s.values, cumulativeBelow, cats, xScale, yScale)}
+              d={buildStackedLinePath(pctVals, cumulativeBelow, cats, xScale, yScale)}
               fill="none"
               stroke={color}
               strokeWidth={2}
@@ -164,14 +171,16 @@ function StackedAreaChartPlot(props: Props) {
       <Animation playbook={[...buildPointPlaybook(plotHeight)]}>
         {series.flatMap((s, si) => {
           const color = SEMANTIC_6[si % SEMANTIC_6.length];
+          const pctVals = percentValues[si];
           const cumulativeBelow = cats.map((_, i) =>
-            series.slice(0, si).reduce((sum, prev) => sum + prev.values[i], 0),
+            percentValues.slice(0, si).reduce((sum, prev) => sum + prev[i], 0),
           );
-          return s.values.map((v, i) => {
+          return pctVals.map((v, i) => {
             const payload: StackedHoverPayload = {
               series: s.name,
               category: cats[i],
-              value: v,
+              value: s.values[i],
+              percent: v,
             };
             const pointKey = `${s.name}-${cats[i]}`;
             return (
@@ -193,18 +202,18 @@ function StackedAreaChartPlot(props: Props) {
       </Animation>
       <Animation playbook={[...LABEL_PLAYBOOK]}>
         {series.map((s, si) => {
+          const pctVals = percentValues[si];
           const cumulativeBelow = cats.map((_, i) =>
-            series.slice(0, si).reduce((sum, prev) => sum + prev.values[i], 0),
+            percentValues.slice(0, si).reduce((sum, prev) => sum + prev[i], 0),
           );
-          const lastIdx = s.values.length - 1;
+          const lastIdx = pctVals.length - 1;
           const lastX = xScale(cats[lastIdx]) + xScale.bandwidth / 2;
-          const lastValue = s.values[lastIdx];
           const lastCum = cumulativeBelow[lastIdx];
           return (
             <Text
               key={`label-${s.name}`}
               x={lastX + 8}
-              y={yScale(lastCum + lastValue) + 4}
+              y={yScale(lastCum + pctVals[lastIdx]) + 4}
               text={s.name}
               fontSize={11}
               fontFamily="sans-serif"
@@ -214,11 +223,17 @@ function StackedAreaChartPlot(props: Props) {
           );
         })}
       </Animation>
-      <Axis scale={xScale} orient="bottom"  length={plotWidth} crossAt={plotHeight}  />
-      <Axis scale={yScale} orient="left"  length={plotHeight} crossAt={0}  />
+      <Axis scale={xScale} orient="bottom" length={plotWidth} crossAt={plotHeight} />
+      <Axis
+        scale={yScale}
+        orient="left"
+        length={plotHeight}
+        crossAt={0}
+        tickFormat={(v) => `${v}%`}
+      />
     </>
   );
 }
 
 
-export default StackedAreaChart;
+export default PercentStackedAreaChart;

@@ -49,9 +49,12 @@ const DEFAULT_ICON =
     '</svg>',
   );
 
-const ICON_PLAYBOOK = [
-  { attribute: 'y', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 20 },
-] as const;
+/** 构建象形柱入场 playbook */
+function buildIconPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'y', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 20 },
+  ] as const;
+}
 
 const FOOTER_PLAYBOOK = [
   { attribute: 'width', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 40 },
@@ -112,7 +115,7 @@ function PictorialBarChartPlot(props: Props) {
         const iconX = x + (xScale.bandwidth - iconW) / 2;
         return (
           <Fragment key={item.name}>
-            <Animation playbook={[...ICON_PLAYBOOK]}>
+            <Animation playbook={[...buildIconPlaybook(plotHeight)]}>
               {Array.from({ length: count }, (_, i) => (
                 <Image
                   key={`icon-${item.name}-${i}`}

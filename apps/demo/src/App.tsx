@@ -1,14 +1,15 @@
 /**
  * App —— ReactVizComposer 二维图表文档站
  *
- * 左侧固定锚点目录 + 右侧全量展示 47 个图表（按分类分组，每组有标题）。
+ * 左侧固定锚点目录 + 右侧全量展示二维图表（按分类分组，每组有标题）。
  * 顶部 Header 带搜索框 + 版本号。
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Layout, Input, Anchor, Empty } from 'antd';
+import { Layout, Input, Anchor, Switch, Select, Space } from 'antd';
 import type { AnchorProps } from 'antd';
 import { ViewportRender } from './components/ViewportRender';
+import { LiveDataProvider, useLiveMode } from './live';
 import {
   BarChartDemo,
   LineChartDemo,
@@ -57,6 +58,29 @@ import {
   DoughnutChartDemo,
   SingleAxisScatterChartDemo,
   BidirectionalBarChartDemo,
+  PercentStackedBarChartDemo,
+  PercentStackedAreaChartDemo,
+  RangeAreaChartDemo,
+  NestedPieChartDemo,
+  DualAxisChartDemo,
+  LollipopChartDemo,
+  DumbbellChartDemo,
+  SlopeChartDemo,
+  BulletChartDemo,
+  PopulationPyramidChartDemo,
+  ParetoChartDemo,
+  ViolinChartDemo,
+  RidgelineChartDemo,
+  HexbinChartDemo,
+  WaffleChartDemo,
+  ProgressRingChartDemo,
+  IcicleChartDemo,
+  CirclePackingChartDemo,
+  ArcDiagramChartDemo,
+  DendrogramChartDemo,
+  RadialTreeChartDemo,
+  AdjacencyMatrixChartDemo,
+  FlightLinesChartDemo,
 } from './components/ChartDemos';
 
 const { Header, Content } = Layout;
@@ -96,6 +120,12 @@ const CATEGORIES: ChartCategory[] = [
       { id: 'pictorial-bar', name: '象形柱图', keywords: ['pictorial', '象形', '柱状图'], demo: <PictorialBarChartDemo /> },
       { id: 'waterfall', name: '瀑布图', keywords: ['waterfall', '瀑布'], demo: <WaterfallChartDemo /> },
       { id: 'histogram', name: '直方图', keywords: ['histogram', '直方图'], demo: <HistogramChartDemo /> },
+      { id: 'percent-stacked-bar', name: '百分比堆叠柱', keywords: ['percent', '百分比', '堆叠', '柱'], demo: <PercentStackedBarChartDemo /> },
+      { id: 'lollipop', name: '棒棒糖图', keywords: ['lollipop', '棒棒糖'], demo: <LollipopChartDemo /> },
+      { id: 'dumbbell', name: '哑铃图', keywords: ['dumbbell', '哑铃'], demo: <DumbbellChartDemo /> },
+      { id: 'bullet', name: '子弹图', keywords: ['bullet', '子弹'], demo: <BulletChartDemo /> },
+      { id: 'population-pyramid', name: '人口金字塔', keywords: ['pyramid', '人口', '金字塔'], demo: <PopulationPyramidChartDemo /> },
+      { id: 'pareto', name: '帕累托图', keywords: ['pareto', '帕累托'], demo: <ParetoChartDemo /> },
     ],
   },
   {
@@ -107,7 +137,11 @@ const CATEGORIES: ChartCategory[] = [
       { id: 'step-line', name: '阶梯线图', keywords: ['step', '阶梯', '折线图'], demo: <StepLineChartDemo /> },
       { id: 'area', name: '面积图', keywords: ['area', '面积'], demo: <AreaChartDemo /> },
       { id: 'stacked-area', name: '堆叠面积图', keywords: ['stacked', '堆叠', '面积'], demo: <StackedAreaChartDemo /> },
+      { id: 'percent-stacked-area', name: '百分比堆叠面积', keywords: ['percent', '百分比', '堆叠', '面积'], demo: <PercentStackedAreaChartDemo /> },
+      { id: 'range-area', name: '区间面积图', keywords: ['range', '区间', '面积', '置信带'], demo: <RangeAreaChartDemo /> },
       { id: 'theme-river', name: '主题河流', keywords: ['theme', 'river', '主题河流', '河流'], demo: <ThemeRiverChartDemo /> },
+      { id: 'ridgeline', name: '山脊图', keywords: ['ridgeline', 'joy', '山脊', '波浪'], demo: <RidgelineChartDemo /> },
+      { id: 'slope', name: '斜率图', keywords: ['slope', '斜率'], demo: <SlopeChartDemo /> },
     ],
   },
   {
@@ -116,9 +150,13 @@ const CATEGORIES: ChartCategory[] = [
     children: [
       { id: 'pie', name: '基础饼图', keywords: ['pie', '饼图', '基础'], demo: <PieChartDemo /> },
       { id: 'doughnut', name: '环形图', keywords: ['doughnut', 'donut', '环形', '甜甜圈'], demo: <DoughnutChartDemo /> },
+      { id: 'nested-pie', name: '嵌套饼图', keywords: ['nested', '嵌套', '饼图'], demo: <NestedPieChartDemo /> },
       { id: 'rose', name: '玫瑰图', keywords: ['rose', '玫瑰', '南丁格尔'], demo: <RoseChartDemo /> },
       { id: 'sunburst', name: '旭日图', keywords: ['sunburst', '旭日', '层级'], demo: <SunburstChartDemo /> },
       { id: 'treemap', name: '矩形树图', keywords: ['treemap', '矩形树', '层级'], demo: <TreemapChartDemo /> },
+      { id: 'icicle', name: '冰柱图', keywords: ['icicle', '冰柱'], demo: <IcicleChartDemo /> },
+      { id: 'circle-packing', name: '圆堆积', keywords: ['circle', 'packing', '圆堆积'], demo: <CirclePackingChartDemo /> },
+      { id: 'waffle', name: '华夫图', keywords: ['waffle', '华夫'], demo: <WaffleChartDemo /> },
       { id: 'funnel', name: '漏斗图', keywords: ['funnel', '漏斗'], demo: <FunnelChartDemo /> },
     ],
   },
@@ -133,6 +171,7 @@ const CATEGORIES: ChartCategory[] = [
       { id: 'explore', name: '可探索散点', keywords: ['explore', '探索', '交互', '散点'], demo: <ExplorableScatterDemo /> },
       { id: 'density-cloud', name: '云图', keywords: ['density', 'cloud', '密度', '云图'], demo: <DensityCloudChartDemo /> },
       { id: 'contour', name: '等值线图', keywords: ['contour', '等值线', '等高线'], demo: <ContourChartDemo /> },
+      { id: 'hexbin', name: '蜂窝热力', keywords: ['hexbin', '蜂窝', '六边形'], demo: <HexbinChartDemo /> },
     ],
   },
   {
@@ -148,6 +187,7 @@ const CATEGORIES: ChartCategory[] = [
     children: [
       { id: 'gauge', name: '仪表盘', keywords: ['gauge', '仪表', '表盘'], demo: <GaugeChartDemo /> },
       { id: 'liquid-fill', name: '水球图', keywords: ['liquid', 'fill', '水球', '水位'], demo: <LiquidFillChartDemo /> },
+      { id: 'progress-ring', name: '环形进度', keywords: ['progress', 'ring', '环形', '进度'], demo: <ProgressRingChartDemo /> },
     ],
   },
   {
@@ -156,6 +196,7 @@ const CATEGORIES: ChartCategory[] = [
     children: [
       { id: 'heatmap', name: '基础热力图', keywords: ['heatmap', '热力', '热图'], demo: <HeatmapChartDemo /> },
       { id: 'calendar-heatmap', name: '日历热力图', keywords: ['calendar', '日历', '热力', 'github'], demo: <CalendarHeatmapChartDemo /> },
+      { id: 'adjacency-matrix', name: '邻接矩阵', keywords: ['adjacency', 'matrix', '邻接', '矩阵'], demo: <AdjacencyMatrixChartDemo /> },
     ],
   },
   {
@@ -174,6 +215,10 @@ const CATEGORIES: ChartCategory[] = [
       { id: 'chord', name: '弦图', keywords: ['chord', '弦图', '和弦'], demo: <ChordChartDemo /> },
       { id: 'circular-graph', name: '环形关系图', keywords: ['circular', 'graph', '环形', '关系'], demo: <CircularGraphChartDemo /> },
       { id: 'tree', name: '树图', keywords: ['tree', '树', '层级', '思维导图'], demo: <TreeChartDemo /> },
+      { id: 'dendrogram', name: '树状图', keywords: ['dendrogram', '树状'], demo: <DendrogramChartDemo /> },
+      { id: 'radial-tree', name: '径向树', keywords: ['radial', 'tree', '径向', '树'], demo: <RadialTreeChartDemo /> },
+      { id: 'arc-diagram', name: '弧线图', keywords: ['arc', 'diagram', '弧线'], demo: <ArcDiagramChartDemo /> },
+      { id: 'flight-lines', name: '飞线图', keywords: ['flight', 'lines', '飞线', '迁徙'], demo: <FlightLinesChartDemo /> },
       { id: 'venn', name: '韦恩图', keywords: ['venn', '韦恩', '集合', '交集'], demo: <VennChartDemo /> },
     ],
   },
@@ -182,12 +227,14 @@ const CATEGORIES: ChartCategory[] = [
     title: '其他',
     children: [
       { id: 'boxplot', name: '箱线图', keywords: ['boxplot', '箱线', '箱型', '统计'], demo: <BoxplotChartDemo /> },
+      { id: 'violin', name: '小提琴图', keywords: ['violin', '小提琴', '统计'], demo: <ViolinChartDemo /> },
       { id: 'errorbar', name: '误差棒', keywords: ['errorbar', '误差', '棒', '统计'], demo: <ErrorBarChartDemo /> },
       { id: 'gantt', name: '甘特图', keywords: ['gantt', '甘特', '进度', '项目'], demo: <GanttChartDemo /> },
       { id: 'timeline', name: '时间线', keywords: ['timeline', '时间线', '时间轴'], demo: <TimelineChartDemo /> },
       { id: 'parallel', name: '平行坐标', keywords: ['parallel', '平行坐标', '多维'], demo: <ParallelCoordinatesChartDemo /> },
       { id: 'wordcloud', name: '词云图', keywords: ['wordcloud', '词云', '文字云'], demo: <WordCloudChartDemo /> },
       { id: 'combo', name: '柱线混合', keywords: ['combo', '混合', '组合'], demo: <ComboChartDemo /> },
+      { id: 'dual-axis', name: '双 Y 轴', keywords: ['dual', 'axis', '双轴'], demo: <DualAxisChartDemo /> },
       { id: 'curvature-comb', name: '曲率梳图', keywords: ['curvature', 'comb', '曲率', '梳'], demo: <CurvatureCombChartDemo /> },
     ],
   },
@@ -253,9 +300,47 @@ function buildAnchorItems(categories: ChartCategory[]): AnchorProps['items'] {
   });
 }
 
+/* ==================== 实时模拟开关 ==================== */
+
+const INTERVAL_OPTIONS = [
+  { value: 50, label: '50ms 硬切压测' },
+  { value: 100, label: '100ms 平滑' },
+  { value: 200, label: '200ms 平滑' },
+  { value: 500, label: '500ms 平滑' },
+];
+
+/** Header 内实时模拟控制条 */
+function LiveDataControls() {
+  const { enabled, intervalMs, setEnabled, setIntervalMs } = useLiveMode();
+
+  return (
+    <Space size={10} style={{ flexShrink: 0 }}>
+      <span style={{ fontSize: 13, color: enabled ? '#69b1ff' : 'rgba(255,255,255,0.55)' }}>
+        实时模拟
+      </span>
+      <Switch
+        size="small"
+        checked={enabled}
+        onChange={setEnabled}
+        checkedChildren="ON"
+        unCheckedChildren="OFF"
+      />
+      <Select
+        size="small"
+        value={intervalMs}
+        disabled={!enabled}
+        options={INTERVAL_OPTIONS}
+        onChange={setIntervalMs}
+        style={{ width: 118 }}
+        popupMatchSelectWidth={false}
+      />
+    </Space>
+  );
+}
+
 /* ==================== 页面 ==================== */
 
-export default function App() {
+function AppShell() {
   const [searchValue, setSearchValue] = useState('');
   const [activeAnchor, setActiveAnchor] = useState<string>('');
   const anchorContainerRef = useRef<HTMLDivElement>(null);
@@ -373,8 +458,9 @@ export default function App() {
           )}
         </div>
 
-        {/* 右侧：描述 + 版本号 */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        {/* 右侧：实时模拟 + 描述 + 版本号 */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+          <LiveDataControls />
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>
             声明式可视化组件库
           </span>
@@ -432,5 +518,14 @@ export default function App() {
         </Content>
       </div>
     </Layout>
+  );
+}
+
+/** App 根：包一层 LiveDataProvider，供图表 Demo 订阅实时模拟 */
+export default function App() {
+  return (
+    <LiveDataProvider>
+      <AppShell />
+    </LiveDataProvider>
   );
 }

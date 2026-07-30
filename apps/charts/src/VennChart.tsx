@@ -1,13 +1,13 @@
 ﻿/**
  * VennChart —— 韦恩图
+ *
+ * 圆半径按实测 plot 尺寸缩放，避免固定面积公式导致图形过小。
  */
 
 import { useMemo } from 'react';
 import { Animation, Ellipse, Text } from '@react-viz-composer/core';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   hoverOpacity,
@@ -73,33 +73,35 @@ function VennChartPlot(props: Props) {
   const vennLabels: string[] = labels ?? vennSets.map((s) => s.name);
   const cx = plotWidth / 2;
   const cy = plotHeight / 2;
+  const baseR = Math.min(plotWidth, plotHeight) * 0.32;
 
   const circles = useMemo(() => {
     if (vennSets.length === 1) {
-      return [{ cx, cy, r: Math.sqrt(vennSets[0].size / Math.PI) * 2.5, setName: vennSets[0].name }];
+      return [{ cx, cy, r: baseR, setName: vennSets[0].name }];
     }
     if (vennSets.length === 2) {
       const s0 = vennSets[0];
       const s1 = vennSets[1];
-      const r0 = Math.sqrt(s0.size / Math.PI) * 2.5;
-      const r1 = Math.sqrt(s1.size / Math.PI) * 2.5;
+      const maxSize = Math.max(s0.size, s1.size, 1);
+      const r0 = baseR * Math.sqrt(s0.size / maxSize);
+      const r1 = baseR * Math.sqrt(s1.size / maxSize);
       const overlapArea = s0.overlap[0] ?? 0;
       const overlapRatio = Math.max(0, Math.min(1, overlapArea / Math.min(s0.size, s1.size)));
-      const dist = (r0 + r1) * (1 - overlapRatio * 0.5);
+      const dist = (r0 + r1) * (1 - overlapRatio * 0.45);
       return [
         { cx: cx - dist / 2, cy, r: r0, setName: s0.name },
         { cx: cx + dist / 2, cy, r: r1, setName: s1.name },
       ];
     }
-    const r = vennSets.map((s) => Math.sqrt(s.size / Math.PI) * 2);
-    const maxR = Math.max(...r);
-    const d = maxR * 1.1;
+    const maxSize = Math.max(...vennSets.map((s) => s.size), 1);
+    const r = vennSets.map((s) => baseR * Math.sqrt(s.size / maxSize));
+    const d = baseR * 0.95;
     return [
-      { cx, cy: cy - d / 2, r: r[0], setName: vennSets[0].name },
-      { cx: cx - d * 0.7, cy: cy + d / 3, r: r[1], setName: vennSets[1].name },
-      { cx: cx + d * 0.7, cy: cy + d / 3, r: r[2], setName: vennSets[2].name },
+      { cx, cy: cy - d * 0.55, r: r[0], setName: vennSets[0].name },
+      { cx: cx - d * 0.75, cy: cy + d * 0.4, r: r[1], setName: vennSets[1].name },
+      { cx: cx + d * 0.75, cy: cy + d * 0.4, r: r[2], setName: vennSets[2].name },
     ];
-  }, [vennSets, cx, cy]);
+  }, [vennSets, cx, cy, baseR]);
 
   return (
     <>

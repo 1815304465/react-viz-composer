@@ -10,8 +10,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleBand,
@@ -38,15 +36,21 @@ interface Props extends ChartItemHoverProps<ComboItem> {
   data?: ComboItem[];
 }
 
-const BAR_PLAYBOOK = [
-  { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-  { attribute: 'y', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-] as const;
+/** 构建柱状入场 playbook */
+function buildBarPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+    { attribute: 'y', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+  ] as const;
+}
 
-const POINT_PLAYBOOK = [
-  { attribute: 'cy', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-  { attribute: 'opacity', from: 0, duration: 400, easing: 'easeOut', targets: 'children', stagger: 40 },
-] as const;
+/** 构建折线点入场 playbook */
+function buildPointPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'cy', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+    { attribute: 'opacity', from: 0, duration: 400, easing: 'easeOut', targets: 'children', stagger: 40 },
+  ] as const;
+}
 
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children' },
@@ -98,16 +102,16 @@ function ComboChartPlot(props: Props) {
 
   const categories = useMemo(() => dataset.map((d) => d.month), [dataset]);
   const xScale = useMemo(
-    () => scaleBand(categories, [0, PLOT_WIDTH], 0.25),
-    [categories],
+    () => scaleBand(categories, [0, plotWidth], 0.25),
+    [categories, plotWidth],
   );
   const yScale = useMemo(() => {
     const max = Math.max(...dataset.map((d) => d.sales)) * 1.15;
-    return scaleLinear([0, max], [PLOT_HEIGHT, 0]);
-  }, [dataset]);
+    return scaleLinear([0, max], [plotHeight, 0]);
+  }, [dataset, plotHeight]);
   const rateScale = useMemo(
-    () => scaleLinear([-20, 30], [PLOT_HEIGHT, 0]),
-    [],
+    () => scaleLinear([-20, 30], [plotHeight, 0]),
+    [plotHeight],
   );
 
   const finalLineD = buildRateLineD(dataset, xScale, rateScale, 1);
@@ -127,15 +131,15 @@ function ComboChartPlot(props: Props) {
         ]}
       />
       <Grid scale={yScale} orient="y"  length={plotWidth} />
-      <Animation playbook={[...BAR_PLAYBOOK]}>
+      <Animation playbook={[...buildBarPlaybook(plotHeight)]}>
         {dataset.map((d) => {
           const x = xScale(d.month);
-          const fullH = PLOT_HEIGHT - yScale(d.sales);
+          const fullH = plotHeight - yScale(d.sales);
           return (
             <Rect
               key={`bar-${d.month}`}
               x={x}
-              y={PLOT_HEIGHT - fullH}
+              y={plotHeight - fullH}
               width={xScale.bandwidth}
               height={fullH}
               fill={activeMonth === d.month ? '#fa8c16' : 'url(#combo-bar-grad)'}
@@ -163,7 +167,7 @@ function ComboChartPlot(props: Props) {
           zIndex={3}
         />
       </Animation>
-      <Animation playbook={[...POINT_PLAYBOOK]}>
+      <Animation playbook={[...buildPointPlaybook(plotHeight)]}>
         {dataset.map((d) => (
           <Ellipse
             key={`rate-${d.month}`}
@@ -183,7 +187,7 @@ function ComboChartPlot(props: Props) {
       {activeMonth && (
         <Animation playbook={[...LABEL_PLAYBOOK]}>
           <Text
-            x={PLOT_WIDTH - 8}
+            x={plotWidth - 8}
             y={16}
             text={`选中: ${activeMonth}`}
             fontSize={11}

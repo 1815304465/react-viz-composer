@@ -1,5 +1,5 @@
-﻿/**
- * StackedBarChart —— 堆叠柱状图
+/**
+ * PercentStackedBarChart —— 百分比堆叠柱状图
  */
 
 import { Animation, Rect, Text } from '@react-viz-composer/core';
@@ -30,6 +30,7 @@ interface StackedHoverPayload {
   series: string;
   category: string;
   value: number;
+  percent: number;
 }
 
 interface Props extends ChartItemHoverProps<StackedHoverPayload> {
@@ -49,16 +50,28 @@ const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 30, delay: 250 },
 ] as const;
 
-export function StackedBarChart(props: Props) {
+/**
+ * 将原始值转为各类目内的百分比
+ */
+function toPercentValues(series: Series[]): number[][] {
+  return series.map((s) =>
+    s.values.map((v, i) => {
+      const total = series.reduce((sum, ser) => sum + ser.values[i], 0);
+      return total > 0 ? (v / total) * 100 : 0;
+    }),
+  );
+}
+
+export function PercentStackedBarChart(props: Props) {
   return (
     <ChartFrame>
-      <StackedBarChartPlot {...props} />
+      <PercentStackedBarChartPlot {...props} />
     </ChartFrame>
   );
 }
 
 /** @param props: Props 图表 props */
-function StackedBarChartPlot(props: Props) {
+function PercentStackedBarChartPlot(props: Props) {
   const { plotWidth, plotHeight } = useChartSize();
 
   const { data, categories, onItemEnter, onItemLeave } = props;
@@ -74,11 +87,9 @@ function StackedBarChartPlot(props: Props) {
   ];
   const cats = categories ?? ['周一', '周二', '周三', '周四', '周五'];
 
+  const percentValues = toPercentValues(series);
   const xScale = scaleBand(cats, [0, plotWidth], 0.3);
-  const maxStacked = Math.max(
-    ...cats.map((_, i) => series.reduce((sum, s) => sum + s.values[i], 0)),
-  ) * 1.1;
-  const yScale = scaleLinear([0, maxStacked], [plotHeight, 0]);
+  const yScale = scaleLinear([0, 100], [plotHeight, 0]);
 
   const segments: {
     key: string;
@@ -91,17 +102,22 @@ function StackedBarChartPlot(props: Props) {
     hovered: boolean;
     hoverProps: Record<string, unknown>;
     labelY: number;
-    value: number;
+    percent: number;
   }[] = [];
 
   cats.forEach((cat, ci) => {
     const x = xScale(cat);
     let cumulativeBelow = 0;
     series.forEach((s, si) => {
-      const val = s.values[ci];
-      const fullH = plotHeight - yScale(val);
+      const pct = percentValues[si][ci];
+      const fullH = plotHeight - yScale(pct);
       const y = plotHeight - cumulativeBelow - fullH;
-      const payload: StackedHoverPayload = { series: s.name, category: cat, value: val };
+      const payload: StackedHoverPayload = {
+        series: s.name,
+        category: cat,
+        value: s.values[ci],
+        percent: pct,
+      };
       segments.push({
         key: `${cat}-${s.name}`,
         x,
@@ -113,7 +129,7 @@ function StackedBarChartPlot(props: Props) {
         hovered: isHovering(`${s.name}-${cat}`),
         hoverProps: bindHover(payload),
         labelY: y + fullH / 2 + 4,
-        value: val,
+        percent: pct,
       });
       cumulativeBelow += fullH;
     });
@@ -121,7 +137,7 @@ function StackedBarChartPlot(props: Props) {
 
   return (
     <>
-      <Grid scale={yScale} orient="y"  length={plotWidth} />
+      <Grid scale={yScale} orient="y" length={plotWidth} />
       <Animation playbook={[...buildBarPlaybook(plotHeight)]}>
         {segments.map((seg) => (
           <Rect
@@ -143,20 +159,26 @@ function StackedBarChartPlot(props: Props) {
             key={`t-${seg.key}`}
             x={seg.x + seg.bandwidth / 2}
             y={seg.labelY}
-            text={seg.fullH >= 12 ? String(seg.value) : ''}
+            text={seg.fullH >= 14 ? `${seg.percent.toFixed(0)}%` : ''}
             fontSize={10}
             fontFamily="sans-serif"
             fill="#fff"
             textAlign="middle"
-            opacity={seg.fullH >= 12 ? 1 : 0}
+            opacity={seg.fullH >= 14 ? 1 : 0}
           />
         ))}
       </Animation>
-      <Axis scale={xScale} orient="bottom"  length={plotWidth} crossAt={plotHeight}  />
-      <Axis scale={yScale} orient="left"  length={plotHeight} crossAt={0}  />
+      <Axis scale={xScale} orient="bottom" length={plotWidth} crossAt={plotHeight} />
+      <Axis
+        scale={yScale}
+        orient="left"
+        length={plotHeight}
+        crossAt={0}
+        tickFormat={(v) => `${v}%`}
+      />
     </>
   );
 }
 
 
-export default StackedBarChart;
+export default PercentStackedBarChart;

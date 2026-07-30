@@ -1,5 +1,5 @@
 ﻿/**
- * apps/charts —— 47 种参考图表实现（仅示例，不对外发布）
+ * apps/charts —— 参考图表实现（仅示例，不对外发布）
  *
  * 所有图表均基于 ReactVizComposer 底层形状组件构建，
  * 遵循统一的 ChartFrame + Animation playbook 开发模式。
@@ -52,3 +52,26 @@ export { SmoothLineChart } from './SmoothLineChart';
 export { DoughnutChart } from './DoughnutChart';
 export { SingleAxisScatterChart } from './SingleAxisScatterChart';
 export { BidirectionalBarChart } from './BidirectionalBarChart';
+export { PercentStackedBarChart } from './PercentStackedBarChart';
+export { PercentStackedAreaChart } from './PercentStackedAreaChart';
+export { RangeAreaChart } from './RangeAreaChart';
+export { NestedPieChart } from './NestedPieChart';
+export { DualAxisChart } from './DualAxisChart';
+export { LollipopChart } from './LollipopChart';
+export { DumbbellChart } from './DumbbellChart';
+export { SlopeChart } from './SlopeChart';
+export { BulletChart } from './BulletChart';
+export { PopulationPyramidChart } from './PopulationPyramidChart';
+export { ParetoChart } from './ParetoChart';
+export { ViolinChart } from './ViolinChart';
+export { RidgelineChart } from './RidgelineChart';
+export { HexbinChart } from './HexbinChart';
+export { WaffleChart } from './WaffleChart';
+export { ProgressRingChart } from './ProgressRingChart';
+export { IcicleChart } from './IcicleChart';
+export { CirclePackingChart } from './CirclePackingChart';
+export { ArcDiagramChart } from './ArcDiagramChart';
+export { DendrogramChart } from './DendrogramChart';
+export { RadialTreeChart } from './RadialTreeChart';
+export { AdjacencyMatrixChart } from './AdjacencyMatrixChart';
+export { FlightLinesChart } from './FlightLinesChart';

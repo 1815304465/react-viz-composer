@@ -1,4 +1,4 @@
-import { useId, useEffect, useRef, useCallback } from 'react';
+import { useId, useLayoutEffect, useRef, useCallback } from 'react';
 import { useViz, useVizFrame, useParentId } from '../context';
 import type { ElementData, ElementType, Transform, VizEvent } from '../engine/types';
 import {
@@ -169,8 +169,8 @@ function useShapeElement<TData extends ElementData>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, registerDrag, eventProps.onDrag, eventProps.onDragEnd, eventProps.onDragStart, eventProps.onMouseDown, eventProps.onPointerDown, eventProps.onTouchStart]);
 
-  // 注册 + 卸载
-  useEffect(() => {
+  // 注册 + 卸载（useLayoutEffect：paint 前入树，供 Animation 首帧写入 from）
+  useLayoutEffect(() => {
     const events = buildShapeEvents(eventProps, handleMouseDown);
     register(parentId, { id, type, data, events, dirty: true, subtreeDirty: true });
     isFirstUpdateRef.current = true;
@@ -178,14 +178,15 @@ function useShapeElement<TData extends ElementData>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, type, parentId]);
 
-  // props 变化时增量更新
+  // props 变化时增量更新（只依赖序列化后的 dataDepKey，避免每渲染新 data 引用打断动画）
   const dataDepKey = shapeEffectDepKey(data as Record<string, unknown>, eventProps);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isFirstUpdateRef.current) { isFirstUpdateRef.current = false; return; }
     const events = buildShapeEvents(eventProps, handleMouseDown);
     update(id, { data, events });
-  }, [id, update, handleMouseDown, data, dataDepKey, eventProps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- data/eventProps 由 dataDepKey 表达
+  }, [id, update, handleMouseDown, dataDepKey]);
 
   return id;
 }

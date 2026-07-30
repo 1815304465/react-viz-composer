@@ -40,10 +40,13 @@ interface Props extends ChartItemHoverProps<KLineItem> {
   data?: KLineItem[];
 }
 
-const BODY_PLAYBOOK = [
-  { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-  { attribute: 'y', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
-] as const;
+/** 构建 K 线实体入场 playbook */
+function buildBodyPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
+    { attribute: 'y', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 25 },
+  ] as const;
+}
 
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', delay: 400 },
@@ -51,6 +54,11 @@ const LABEL_PLAYBOOK = [
 
 /**
  * 构建 K 线 wick 动画 playbook
+ * @param cx 中心 x
+ * @param high 最高价
+ * @param low 最低价
+ * @param base 入场基线（通常为 plotHeight）
+ * @param yScale y 比例尺
  */
 function buildWickPlaybook(cx: number, high: number, low: number, base: number, yScale: LinearScale) {
   const highY = yScale(high);
@@ -61,8 +69,8 @@ function buildWickPlaybook(cx: number, high: number, low: number, base: number, 
     targets: 'wick',
     compute: ({ progress }: { progress: number }) => ({
       points: [
-        { x: cx, y: PLOT_HEIGHT + (highY - PLOT_HEIGHT) * progress },
-        { x: cx, y: PLOT_HEIGHT + (lowY - PLOT_HEIGHT) * progress },
+        { x: cx, y: base + (highY - base) * progress },
+        { x: cx, y: base + (lowY - base) * progress },
       ],
     }),
   }];
@@ -124,7 +132,7 @@ function CandlestickChartPlot(props: Props) {
           </Animation>
         );
       })}
-      <Animation playbook={[...BODY_PLAYBOOK]}>
+      <Animation playbook={[...buildBodyPlaybook(plotHeight)]}>
         {items.map((d) => {
           const x = xScale(d.date);
           const bw = xScale.bandwidth;

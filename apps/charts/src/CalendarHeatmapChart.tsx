@@ -6,7 +6,6 @@ import { useMemo } from 'react';
 import { Animation, Rect, Text } from '@react-viz-composer/core';
 import {
   ChartFrame,
-  PLOT_WIDTH,
   useChartItemHover,
   hoverStrokeWidth,
   TEXT_COLOR,
@@ -55,7 +54,7 @@ const CELL_PLAYBOOK = [
  */
 export function CalendarHeatmapChart(props: Props) {
   return (
-    <ChartFrame>
+    <ChartFrame padding={{ top: 12, right: 12, bottom: 12, left: 12 }}>
       <CalendarHeatmapChartPlot {...props} />
     </ChartFrame>
   );
@@ -72,7 +71,7 @@ function CalendarHeatmapChartPlot(props: Props) {
   );
 
   const dataset: CalendarDay[] = useMemo(() => {
-    if (data) return data;
+    if (data && data.length > 0) return data;
     const now = new Date();
     const year = now.getFullYear();
     const out: CalendarDay[] = [];
@@ -82,7 +81,8 @@ function CalendarHeatmapChartPlot(props: Props) {
     while (d <= end) {
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const hash = dateStr.split('').reduce((s, c) => s + c.charCodeAt(0), 0);
-      const v = (Math.sin(hash * 0.1) * 0.5 + 0.5) * 10 + (Math.random() * 2);
+      // 确定性伪随机，避免 Math.random 与 StrictMode 双调用不一致
+      const v = (Math.sin(hash * 0.1) * 0.5 + 0.5) * 10;
       out.push({ date: dateStr, value: Math.round(v) });
       d.setDate(d.getDate() + 1);
     }
@@ -123,31 +123,53 @@ function CalendarHeatmapChartPlot(props: Props) {
     return weeks;
   }, [year]);
 
-  const totalWidth = grid.length * CELL_STEP;
-  const offsetX = Math.max(10, (plotWidth - totalWidth) / 2);
-  const offsetY = 30;
+  // 优先按高度撑满 7 行，避免全年 ~53 周挤进方卡后变成细条；装不下则只展示最近几周
+  const labelCol = 32;
+  const monthBand = 20;
+  const availableW = Math.max(plotWidth - labelCol - 4, 80);
+  const availableH = Math.max(plotHeight - monthBand - 4, 80);
+  const heightStep = Math.min(CELL_STEP, availableH / 7);
+  const maxWeeks = Math.max(8, Math.floor(availableW / Math.max(heightStep, 1)));
+  const weekOffset = Math.max(0, grid.length - maxWeeks);
+  const visibleGrid = weekOffset > 0 ? grid.slice(weekOffset) : grid;
+  const cellStep = Math.min(
+    CELL_STEP,
+    availableW / Math.max(visibleGrid.length, 1),
+    availableH / 7,
+  );
+  const cellSize = Math.max(5, cellStep - Math.max(1, CELL_GAP * (cellStep / CELL_STEP)));
+  const totalWidth = visibleGrid.length * cellStep;
+  const totalHeight = 7 * cellStep;
+  const offsetX = labelCol + Math.max(0, (availableW - totalWidth) / 2);
+  const offsetY = monthBand + Math.max(0, (availableH - totalHeight) / 2);
 
   const months = useMemo(() => {
     const result: { label: string; weekIdx: number }[] = [];
-    for (let m = 0; m < 12; m++) {
-      const d = new Date(year, m, 15);
-      const dayOfYear = Math.floor((d.getTime() - new Date(year, 0, 1).getTime()) / 86400000);
-      const weekIdx = Math.floor((dayOfYear + new Date(year, 0, 1).getDay()) / 7);
-      if (result.length > 0 && result[result.length - 1].label === `${m + 1}月`) continue;
-      if (weekIdx >= 0 && weekIdx < grid.length) {
-        result.push({ label: `${m + 1}月`, weekIdx });
+    let lastMonth = -1;
+    visibleGrid.forEach((week, weekIdx) => {
+      const inYear = week.find((day) => day.date.startsWith(`${year}-`));
+      if (!inYear) return;
+      const month = Number(inYear.date.slice(5, 7));
+      if (month === lastMonth) return;
+      if (result.length > 0 && weekIdx - result[result.length - 1].weekIdx < 2) {
+        lastMonth = month;
+        return;
       }
-    }
+      lastMonth = month;
+      result.push({ label: `${month}月`, weekIdx });
+    });
     return result;
-  }, [year, grid.length]);
+  }, [year, visibleGrid]);
+
+  const weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
   return (
     <>
       {DAY_LABELS.map((label, i) => (
         <Text
           key={`day-${i}`}
-          x={offsetX - 8}
-          y={offsetY + i * CELL_STEP + CELL_SIZE / 2 + 3}
+          x={offsetX - 6}
+          y={offsetY + i * cellStep + cellSize / 2 + 3}
           text={label}
           fontSize={10}
           fontFamily="sans-serif"
@@ -157,39 +179,39 @@ function CalendarHeatmapChartPlot(props: Props) {
       ))}
       {months.map((mo) => (
         <Text
-          key={`mo-${mo.label}`}
-          x={offsetX + mo.weekIdx * CELL_STEP + CELL_SIZE / 2}
-          y={offsetY - 10}
+          key={`mo-${mo.label}-${mo.weekIdx}`}
+          x={offsetX + mo.weekIdx * cellStep + cellSize / 2}
+          y={offsetY - 8}
           text={mo.label}
-          fontSize={9}
+          fontSize={10}
           fontFamily="sans-serif"
           fill={TEXT_COLOR}
           textAlign="middle"
         />
       ))}
       <Animation playbook={[...CELL_PLAYBOOK]}>
-        {grid.flatMap((week, wi) =>
+        {visibleGrid.flatMap((week, wi) =>
           week.map((day) => {
             const v = valMap.get(day.date) ?? 0;
-            const x = offsetX + wi * CELL_STEP;
-            const y = offsetY + day.dayOfWeek * CELL_STEP;
+            const x = offsetX + wi * cellStep;
+            const y = offsetY + day.dayOfWeek * cellStep;
             const payload: CalendarHoverPayload = {
               date: day.date,
               value: v,
-              dayOfWeek: DAY_LABELS[day.dayOfWeek],
+              dayOfWeek: weekdayNames[day.dayOfWeek],
             };
             return (
               <Rect
                 key={day.date}
                 x={x}
                 y={y}
-                width={CELL_SIZE}
-                height={CELL_SIZE}
+                width={cellSize}
+                height={cellSize}
                 fill={heatColor(v, maxVal)}
                 stroke="#fff"
                 strokeWidth={hoverStrokeWidth(0.5, isHovering(day.date))}
-                rx={3}
-                ry={3}
+                rx={2}
+                ry={2}
                 opacity={1}
                 {...bindHover(payload)}
               />

@@ -8,8 +8,6 @@
 import { Animation, Path, Ellipse, Text, ClipPath } from '@react-viz-composer/core';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   SEMANTIC_6,
   TEXT_COLOR,
   useChartSize,
@@ -182,27 +180,27 @@ function LiquidFillChartPlot(props: Props) {
         <ClipPath clip={<Ellipse cx={cx} cy={cy} rx={r} ry={r} />}>
           <Path
             id="water"
-            d={buildWavePaths(cx, cy, r, pct, 0, 1).fullWaterD}
+            d={buildWavePaths(cx, cy, r, pct, 0, 0).fullWaterD}
             fill={SEMANTIC_6[0]}
-            opacity={0.6}
+            opacity={0}
           />
           <Path
             id="water2"
-            d={buildWavePaths(cx, cy, r, pct, 0, 1).fullWaterD2}
+            d={buildWavePaths(cx, cy, r, pct, 0, 0).fullWaterD2}
             fill={SEMANTIC_6[0]}
-            opacity={0.35}
+            opacity={0}
           />
         </ClipPath>
         <Text
           id="value-text"
           x={cx}
           y={cy - 8}
-          text={`${pct}%`}
+          text="0%"
           fontSize={32}
           fontWeight="bold"
           fontFamily="sans-serif"
           fill={SEMANTIC_6[0]}
-          opacity={0.9}
+          opacity={0}
           textAlign="middle"
         />
         <Text
@@ -214,7 +212,7 @@ function LiquidFillChartPlot(props: Props) {
           fontFamily="sans-serif"
           fill={TEXT_COLOR}
           textAlign="middle"
-          opacity={1}
+          opacity={0}
         />
       </Animation>
       <Ellipse cx={cx} cy={cy} rx={r} ry={r} fill="none" stroke={SEMANTIC_6[0]} strokeWidth={3} />

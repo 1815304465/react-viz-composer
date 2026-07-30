@@ -10,8 +10,6 @@ import {
 } from '@react-viz-composer/kit';
 import {
   ChartFrame,
-  PLOT_WIDTH,
-  PLOT_HEIGHT,
   useChartItemHover,
   hoverStrokeWidth,
   scaleBand,
@@ -41,10 +39,13 @@ interface Props extends ChartItemHoverProps<ErrorBarItem> {
 
 const CAP_W = 6;
 
-const BAR_PLAYBOOK = [
-  { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-  { attribute: 'y', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-] as const;
+/** 构建误差柱入场 playbook */
+function buildBarPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'height', from: 0, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+    { attribute: 'y', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+  ] as const;
+}
 
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 40, delay: 200 },
@@ -55,20 +56,21 @@ const LABEL_PLAYBOOK = [
  * @param cx 柱心 x
  * @param item 数据项
  * @param yScale y 比例尺
+ * @param plotHeight 实测绘图区高度
  */
-function buildColumnPlaybook(cx: number, item: ErrorBarItem, yScale: LinearScale) {
+function buildColumnPlaybook(cx: number, item: ErrorBarItem, yScale: LinearScale, plotHeight: number) {
   const errTop = yScale(item.value + item.error);
   const errBot = yScale(item.value - item.error);
   return [
-    ...BAR_PLAYBOOK,
+    ...buildBarPlaybook(plotHeight),
     {
       duration: 600,
       easing: 'easeOutCubic' as const,
       targets: 'errLine',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx, y: PLOT_HEIGHT + (errTop - PLOT_HEIGHT) * progress },
-          { x: cx, y: PLOT_HEIGHT + (errBot - PLOT_HEIGHT) * progress },
+          { x: cx, y: plotHeight + (errTop - plotHeight) * progress },
+          { x: cx, y: plotHeight + (errBot - plotHeight) * progress },
         ],
       }),
     },
@@ -78,8 +80,8 @@ function buildColumnPlaybook(cx: number, item: ErrorBarItem, yScale: LinearScale
       targets: 'topCap',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx - CAP_W, y: PLOT_HEIGHT + (errTop - PLOT_HEIGHT) * progress },
-          { x: cx + CAP_W, y: PLOT_HEIGHT + (errTop - PLOT_HEIGHT) * progress },
+          { x: cx - CAP_W, y: plotHeight + (errTop - plotHeight) * progress },
+          { x: cx + CAP_W, y: plotHeight + (errTop - plotHeight) * progress },
         ],
       }),
     },
@@ -89,8 +91,8 @@ function buildColumnPlaybook(cx: number, item: ErrorBarItem, yScale: LinearScale
       targets: 'botCap',
       compute: ({ progress }: { progress: number }) => ({
         points: [
-          { x: cx - CAP_W, y: PLOT_HEIGHT + (errBot - PLOT_HEIGHT) * progress },
-          { x: cx + CAP_W, y: PLOT_HEIGHT + (errBot - PLOT_HEIGHT) * progress },
+          { x: cx - CAP_W, y: plotHeight + (errBot - plotHeight) * progress },
+          { x: cx + CAP_W, y: plotHeight + (errBot - plotHeight) * progress },
         ],
       }),
     },
@@ -145,7 +147,7 @@ function ErrorBarChartPlot(props: Props) {
         const cx = x + xScale.bandwidth / 2;
         const fullHeight = plotHeight - yScale(d.value);
         return (
-          <Animation key={d.category} playbook={buildColumnPlaybook(cx, d, yScale)}>
+          <Animation key={d.category} playbook={buildColumnPlaybook(cx, d, yScale, plotHeight)}>
             <Group>
               <Rect
                 x={x}

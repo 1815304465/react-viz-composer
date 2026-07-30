@@ -43,10 +43,13 @@ const PATH_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 700, easing: 'easeOut', targets: 'children', stagger: 120 },
 ] as const;
 
-const POINT_PLAYBOOK = [
-  { attribute: 'cy', from: PLOT_HEIGHT, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
-  { attribute: 'opacity', from: 0, duration: 400, easing: 'easeOut', targets: 'children', stagger: 40 },
-] as const;
+/** 构建点入场 playbook */
+function buildPointPlaybook(plotHeight: number) {
+  return [
+    { attribute: 'cy', from: plotHeight, duration: 600, easing: 'easeOutCubic', targets: 'children', stagger: 40 },
+    { attribute: 'opacity', from: 0, duration: 400, easing: 'easeOut', targets: 'children', stagger: 40 },
+  ] as const;
+}
 
 const LABEL_PLAYBOOK = [
   { attribute: 'opacity', from: 0, duration: 500, easing: 'easeOut', targets: 'children', stagger: 120, delay: 300 },
@@ -140,7 +143,7 @@ function AreaChartPlot(props: Props) {
           />
         ))}
       </Animation>
-      <Animation playbook={[...POINT_PLAYBOOK]}>
+      <Animation playbook={[...buildPointPlaybook(plotHeight)]}>
         {series.flatMap((s, idx) => {
           const color = SEMANTIC_6[idx % SEMANTIC_6.length];
           return s.values.map((v, i) => {
