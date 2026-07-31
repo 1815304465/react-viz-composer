@@ -92,6 +92,9 @@ export function HomePage({ onNavigate }: HomePageProps) {
           <Button type="primary" size="large" onClick={() => onNavigate('examples')}>
             浏览示例
           </Button>
+          <Button size="large" onClick={() => onNavigate('scenarios')}>
+            场景演示
+          </Button>
           <Button size="large" onClick={() => onNavigate('docs')}>
             阅读文档
           </Button>

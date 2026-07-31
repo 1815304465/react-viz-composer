@@ -5,6 +5,7 @@
  *   /           首页 —— 哲学、特性、快速上手
  *   /docs       文档 —— 完整的 API 文档和使用指南
  *   /examples   示例 —— 47 种参考图表画廊
+ *   /scenarios  场景 —— 网络拓扑、工业HMI、实时大屏、粒子系统、智慧园区、知识图谱
  *
  * 顶部 Header 统一风格，全局搜索始终可见。
  */
@@ -17,6 +18,7 @@ import {
   HomeOutlined,
   BookOutlined,
   AppstoreOutlined,
+  CompassOutlined,
   SearchOutlined,
   ThunderboltOutlined,
   PauseCircleOutlined,
@@ -100,12 +102,20 @@ import {
   AdjacencyMatrixChartDemo,
   FlightLinesChartDemo,
 } from './components/ChartDemos';
+import {
+  NetworkTopology,
+  IndustrialHMI,
+  RealtimeDashboard,
+  ParticleFlow,
+  SmartCampus,
+  KnowledgeGraph,
+} from './scenarios';
 
 const { Header, Content } = Layout;
 
 /* ==================== 类型 ==================== */
 
-type PageKey = 'home' | 'docs' | 'examples';
+type PageKey = 'home' | 'docs' | 'examples' | 'scenarios';
 
 interface PageTab {
   key: PageKey;
@@ -118,11 +128,13 @@ const TABS: PageTab[] = [
   { key: 'home', label: '首页', icon: <HomeOutlined />, path: '/' },
   { key: 'docs', label: '文档', icon: <BookOutlined />, path: '/docs' },
   { key: 'examples', label: '示例', icon: <AppstoreOutlined />, path: '/examples' },
+  { key: 'scenarios', label: '场景', icon: <CompassOutlined />, path: '/scenarios' },
 ];
 
 function getActiveKey(pathname: string): PageKey {
   if (pathname.startsWith('/docs')) return 'docs';
   if (pathname.startsWith('/examples')) return 'examples';
+  if (pathname.startsWith('/scenarios')) return 'scenarios';
   return 'home';
 }
 
@@ -466,6 +478,16 @@ const DOC_SECTIONS: SearchItem[] = [
   { id: 'types', keywords: ['类型', 'TypeScript', 'type', 'VizEvent', 'RectData', 'GroupData', 'ShapeEventProps', 'AnimStep', '类型导出'], value: '类型导出', route: '/docs', anchorId: 'types', type: 'doc', category: 'API', name: '类型导出', description: 'RectData / VizEvent / AnimStep ...' },
 ];
 
+/** 场景搜索索引 */
+const SCENARIO_SECTIONS: SearchItem[] = [
+  { id: 'sc-topology', keywords: ['网络拓扑', 'Leaf-Spine', '交换机', '拓扑', 'topology', '网络', 'spine', 'leaf'], value: '企业网络拓扑', route: '/scenarios', anchorId: 'scenario-topology', type: 'doc', category: '场景', name: '企业网络拓扑', description: 'Leaf-Spine 网络架构拓扑可视化' },
+  { id: 'sc-hmi', keywords: ['工业', 'HMI', '产线', '组态', '监控', 'industrial', '工厂', '设备'], value: '工业产线 HMI', route: '/scenarios', anchorId: 'scenario-hmi', type: 'doc', category: '场景', name: '工业产线 HMI', description: '工厂产线设备状态监控界面' },
+  { id: 'sc-dashboard', keywords: ['大屏', 'dashboard', '实时', '仪表盘', '监控', 'realtime', '数据大屏'], value: '实时数据大屏', route: '/scenarios', anchorId: 'scenario-dashboard', type: 'doc', category: '场景', name: '实时数据大屏', description: '多指标实时监控仪表盘' },
+  { id: 'sc-particle', keywords: ['粒子', '粒子系统', 'particle', '流动', '数据流', '动画', '粒子动画'], value: '粒子流动系统', route: '/scenarios', anchorId: 'scenario-particle', type: 'doc', category: '场景', name: '粒子流动系统', description: '大规模粒子动画数据流模拟' },
+  { id: 'sc-campus', keywords: ['智慧园区', '园区', '楼宇', '停车', 'campus', 'smart', '安防', '能耗'], value: '智慧园区', route: '/scenarios', anchorId: 'scenario-campus', type: 'doc', category: '场景', name: '智慧园区', description: '楼宇/能源/停车/安防一体化概览' },
+  { id: 'sc-kg', keywords: ['知识图谱', '知识网络', '社交网络', 'knowledge', 'graph', '图谱', '实体', '关系'], value: '知识图谱', route: '/scenarios', anchorId: 'scenario-kg', type: 'doc', category: '场景', name: '知识图谱', description: '科技领域实体关系图谱' },
+];
+
 function buildChartSearchItems(): SearchItem[] {
   return ALL_ENTRIES.map((e) => {
     const cat = CATEGORIES.find((c) => c.key === e.categoryKey);
@@ -496,9 +518,9 @@ function HeaderBar() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const searchInputRef = useRef<InputRef>(null);
 
-  // 搜索索引：图表 + 文档
+  // 搜索索引：图表 + 文档 + 场景
   const chartItems = useMemo(() => buildChartSearchItems(), []);
-  const allItems = useMemo(() => [...DOC_SECTIONS, ...chartItems], [chartItems]);
+  const allItems = useMemo(() => [...DOC_SECTIONS, ...SCENARIO_SECTIONS, ...chartItems], [chartItems]);
 
   // Ctrl+K / Cmd+K 聚焦搜索
   useEffect(() => {
@@ -895,6 +917,145 @@ function ExamplesPage() {
   );
 }
 
+/* ==================== 场景页 ==================== */
+
+interface ScenarioEntry {
+  id: string;
+  title: string;
+  description: string;
+  tags: string[];
+  demo: React.ReactNode;
+  /** 渲染区高度 */
+  demoHeight?: number;
+}
+
+const SCENARIO_CARD_W = 680;
+const SCENARIO_CARD_H = 440;
+const SCENARIO_CARD_GAP = 32;
+
+const SCENARIOS: ScenarioEntry[] = [
+  {
+    id: 'topology',
+    title: '企业网络拓扑',
+    description: 'Leaf-Spine 数据中心网络架构可视化，展示交换机节点与光纤链路，支持数据包流动动画。',
+    tags: ['网络', '拓扑', 'Leaf-Spine'],
+    demo: <NetworkTopology width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+  {
+    id: 'hmi',
+    title: '工业产线 HMI',
+    description: '工厂产线设备状态监控界面，展示熔炉、CNC、传送带等设备运行状态与实时数据。',
+    tags: ['工业', 'HMI', '组态'],
+    demo: <IndustrialHMI width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+  {
+    id: 'dashboard',
+    title: '实时数据大屏',
+    description: '多指标监控仪表盘，包含 KPI 卡片、柱状图、趋势线和环形进度，模拟生产环境大屏。',
+    tags: ['大屏', '实时', '仪表盘'],
+    demo: <RealtimeDashboard width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+  {
+    id: 'particle',
+    title: '粒子流动系统',
+    description: '47 个粒子沿 4 条贝塞尔曲线轨迹流动，模拟数据流传输，展示 Animation compute 能力。',
+    tags: ['粒子', '动画', '数据流'],
+    demo: <ParticleFlow width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+  {
+    id: 'campus',
+    title: '智慧园区',
+    description: '园区一体化概览大屏，集成楼宇入驻率、能耗监控、停车位占用和环境传感器数据。',
+    tags: ['园区', '楼宇', '停车'],
+    demo: <SmartCampus width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+  {
+    id: 'kg',
+    title: '知识图谱',
+    description: '科技领域 15 个实体关系图谱：悬停高亮关联边，拖拽节点后以该点为锚自动力导向重布局。',
+    tags: ['知识图谱', '拖拽', '力导向'],
+    demo: <KnowledgeGraph width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+  },
+];
+
+function ScenariosPage() {
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  return (
+    <div style={{ maxWidth: SCENARIO_CARD_W + 80, margin: '0 auto', padding: '40px 32px 80px' }}>
+      <h1 style={{ fontSize: 24, fontWeight: 600, color: '#141414', margin: '0 0 8px' }}>
+        场景可视化
+      </h1>
+      <p style={{ fontSize: 14, color: '#8c8c8c', margin: '0 0 40px', lineHeight: 1.6 }}>
+        这些场景全部基于 ReactVizComposer 底层形状组件（Rect、Ellipse、Line、Path、Text、
+        Group、Animation 等）构建，展示框架在非图表领域的通用可视化能力。
+      </p>
+
+      {SCENARIOS.map((scenario) => (
+        <div
+          key={scenario.id}
+          id={`scenario-${scenario.id}`}
+          style={{ marginBottom: SCENARIO_CARD_GAP, scrollMarginTop: 80 }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 8,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+              overflow: 'hidden',
+              border: '1px solid #f0f0f0',
+            }}
+          >
+            {/* 渲染区 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#fafafa',
+                padding: '8px 0',
+              }}
+            >
+              <ViewportRender minHeight={SCENARIO_CARD_H}>
+                {scenario.demo}
+              </ViewportRender>
+            </div>
+            {/* 信息区 */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid #f0f0f0' }}>
+              <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#141414' }}>
+                {scenario.title}
+              </h3>
+              <p style={{ margin: '0 0 10px', fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
+                {scenario.description}
+              </p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {scenario.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      color: '#1677ff',
+                      background: '#e6f4ff',
+                      borderRadius: 4,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ==================== 首页适配 ==================== */
 
 function HomePageWrapper() {
@@ -931,6 +1092,7 @@ function AppLayout() {
           <Route path="/" element={<HomePageWrapper />} />
           <Route path="/docs" element={<DocsPageWrapper />} />
           <Route path="/examples" element={<ExamplesPage />} />
+          <Route path="/scenarios" element={<ScenariosPage />} />
         </Routes>
       </div>
 
