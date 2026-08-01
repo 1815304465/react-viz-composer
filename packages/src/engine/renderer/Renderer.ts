@@ -5,6 +5,7 @@ import { IDENTITY_MAT3, type Mat3 } from '../utils/constants/matrix';
 import {
   transformToMatrix, multiplyMat3,
   estimateLocalBounds, boundsIntersectViewport,
+  worldDeltaToLocalDelta,
 } from '../utils';
 
 /** 默认视口：不缩放、不平移 */
@@ -53,7 +54,10 @@ abstract class Renderer {
   protected viewWidth = 0;
   protected viewHeight = 0;
 
-  /** 可视区域裁剪边距 */
+  /**
+   * 可视区域裁剪边距（CSS 像素）
+   * 挂载前为全 0（不裁）；setCullMargin 后未显式给出的边默认画布对应边的 20%
+   */
   protected cullMargin: Required<ViewportCullMargin> = { top: 0, right: 0, bottom: 0, left: 0 };
 
   /** 注入 Model */
@@ -62,17 +66,20 @@ abstract class Renderer {
   }
 
   /**
-   * 设置裁剪边距（传入画布尺寸的百分比；边距不能小于 0 即不允许向内收缩）
+   * 设置裁剪边距（未指定的边默认画布宽/高的 20%；不允许负值）
+   * 传四边均为 0 可关闭裁剪
    * @param margin 裁剪边距
    * @param canvasWidth 画布宽度
    * @param canvasHeight 画布高度
    */
   setCullMargin(margin: ViewportCullMargin, canvasWidth: number, canvasHeight: number): void {
+    const defaultX = canvasWidth > 0 ? canvasWidth * 0.2 : 0;
+    const defaultY = canvasHeight > 0 ? canvasHeight * 0.2 : 0;
     this.cullMargin = {
-      top: Math.max(0, margin.top ?? canvasHeight * 0.2),
-      right: Math.max(0, margin.right ?? canvasWidth * 0.2),
-      bottom: Math.max(0, margin.bottom ?? canvasHeight * 0.2),
-      left: Math.max(0, margin.left ?? canvasWidth * 0.2),
+      top: Math.max(0, margin.top ?? defaultY),
+      right: Math.max(0, margin.right ?? defaultX),
+      bottom: Math.max(0, margin.bottom ?? defaultY),
+      left: Math.max(0, margin.left ?? defaultX),
     };
     // 如果宽高还没设置，在 resize 时再次补调
     if (canvasWidth > 0) this.viewWidth = canvasWidth;
@@ -121,6 +128,26 @@ abstract class Renderer {
   protected abstract startDrag(id: string, onDrag: VizDragEventHandler, onDragEnd: VizDragEventHandler, evt: MouseEvent): void;
   protected abstract stopDrag(): void;
 
+  /**
+   * 将屏幕像素位移转为元素局部坐标位移
+   * screen → world（除以 viewport.scale）→ 再经 worldMatrix 线性逆到局部
+   * @param id 拖拽元素 id
+   * @param screenDx 屏幕 dx（CSS 像素）
+   * @param screenDy 屏幕 dy
+   */
+  protected screenDeltaToLocalDragDelta(
+    id: string,
+    screenDx: number,
+    screenDy: number,
+  ): { x: number; y: number } {
+    const invScale = 1 / this.viewport.scale;
+    const worldDx = screenDx * invScale;
+    const worldDy = screenDy * invScale;
+    const record = this.model?.getElement(id);
+    if (!record) return { x: worldDx, y: worldDy };
+    return worldDeltaToLocalDelta((record.worldMatrix ?? IDENTITY_MAT3) as Mat3, worldDx, worldDy);
+  }
+
   /** 渲染入口：接收所有 top-level 元素 */
   abstract render(roots: ElementRecord[]): void;
   /** 渲染单个元素 */
@@ -147,18 +174,13 @@ abstract class Renderer {
     const { x: vx, y: vy, scale } = this.viewport;
     const invScale = 1 / scale;
 
-    // 视口在画布坐标系中的可见范围
-    const visX = -vx - left;
-    const visY = -vy - top;
-    const visW = this.viewWidth + left + right;
-    const visH = this.viewHeight + top + bottom;
-
-    // 转换到世界坐标
+    // Canvas/命中约定：screen = scale * (world + v) ⇒ world = screen/scale - v
+    // 边距 left/top 为屏幕像素，需先 /scale 再叠加到世界坐标
     return {
-      x: visX * invScale,
-      y: visY * invScale,
-      w: visW * invScale,
-      h: visH * invScale,
+      x: -vx - left * invScale,
+      y: -vy - top * invScale,
+      w: (this.viewWidth + left + right) * invScale,
+      h: (this.viewHeight + top + bottom) * invScale,
     };
   }
 

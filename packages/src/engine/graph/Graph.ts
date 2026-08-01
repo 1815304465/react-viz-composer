@@ -26,6 +26,8 @@ class Graph {
   private forceRender = false;
   private lastSyncDelta: SyncDelta | null = null;
   private notifyHandlers: Array<() => void> = [];
+  /** 裁剪边距配置；空对象表示四边走默认 20% */
+  private cullMarginOpt: ViewportCullMargin = {};
 
   constructor(options: GraphOptions = {}) {
     const { engine = 'svg', cullMargin } = options;
@@ -42,9 +44,7 @@ class Graph {
 
     this.scheduler.setContinueCheck(() => this.needsRender());
 
-    if (cullMargin) {
-      this.renderer.setCullMargin(cullMargin, 0, 0);
-    }
+    this.cullMarginOpt = cullMargin ?? {};
   }
 
   /** 将渲染目标挂载到 DOM 容器，启动渲染循环 */
@@ -59,6 +59,8 @@ class Graph {
     const rect = container.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       this.renderer.resize(rect.width, rect.height);
+      // 未显式传边时默认四边各 20% 画布尺寸
+      this.renderer.setCullMargin(this.cullMarginOpt, rect.width, rect.height);
     }
 
     this.forceRender = true;
@@ -125,6 +127,7 @@ class Graph {
   }
 
   setCullMargin(margin: ViewportCullMargin, containerWidth: number, containerHeight: number): void {
+    this.cullMarginOpt = margin;
     this.renderer.setCullMargin(margin, containerWidth, containerHeight);
     this.forceRender = true;
     this.scheduler.wake();

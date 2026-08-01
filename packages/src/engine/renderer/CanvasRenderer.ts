@@ -123,7 +123,7 @@ class CanvasRenderer extends Renderer {
 
   /**
    * 开始拖拽：注册全局 pointermove/pointerup 监听器
-   * 将屏幕像素位移转换为视口坐标系位移（除以 scale）
+   * 屏幕位移 → 元素局部坐标（扣除 viewport.scale 与祖先 worldMatrix）
    * @param id 拖拽元素 id
    * @param onDrag 拖拽移动回调
    * @param onEnd 拖拽结束回调
@@ -142,22 +142,21 @@ class CanvasRenderer extends Renderer {
 
     const globalMove = (e: PointerEvent) => {
       if (this.dragElementId !== id) return;
-      const invScale = 1 / this.viewport.scale;
-      const dx = (e.clientX - this.dragStartX) * invScale;
-      const dy = (e.clientY - this.dragStartY) * invScale;
-      const stepX = (e.clientX - this.dragLastX) * invScale;
-      const stepY = (e.clientY - this.dragLastY) * invScale;
+      const total = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+      const step = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragLastX, e.clientY - this.dragLastY);
       this.dragLastX = e.clientX;
       this.dragLastY = e.clientY;
-      this.dragOnDrag?.({ dx, dy, stepX, stepY, originalEvent: e, elementId: id });
+      this.dragOnDrag?.({
+        dx: total.x, dy: total.y, stepX: step.x, stepY: step.y, originalEvent: e, elementId: id,
+      });
     };
 
     const globalUp = (e: PointerEvent) => {
       if (this.dragElementId !== id) return;
-      const invScale = 1 / this.viewport.scale;
-      const dx = (e.clientX - this.dragStartX) * invScale;
-      const dy = (e.clientY - this.dragStartY) * invScale;
-      this.dragOnEnd?.({ dx, dy, stepX: 0, stepY: 0, originalEvent: e, elementId: id });
+      const total = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+      this.dragOnEnd?.({
+        dx: total.x, dy: total.y, stepX: 0, stepY: 0, originalEvent: e, elementId: id,
+      });
       this.dispatchDragVizEvent('dragend', id, e);
       this.stopDrag();
     };

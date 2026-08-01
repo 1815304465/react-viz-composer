@@ -4,6 +4,7 @@ import type { ElementRecord, RectData, EllipseData, LineData, PathData, TextData
 import { isDescendantOf } from './elements';
 import { getPathBounds } from './pathBounds';
 import { estimatePointsBounds } from './points';
+import { localBoundsToWorldAABB, worldToLocalPoint } from './maths';
 
 /** 元素轴对齐包围盒 */
 interface ElementBounds {
@@ -157,46 +158,66 @@ function boundsIntersectViewport(
   worldMatrix: Mat3,
   visible: { x: number; y: number; w: number; h: number },
 ): boolean {
-  const corners = [
-    { x: localBounds.x, y: localBounds.y },
-    { x: localBounds.x + localBounds.w, y: localBounds.y },
-    { x: localBounds.x, y: localBounds.y + localBounds.h },
-    { x: localBounds.x + localBounds.w, y: localBounds.y + localBounds.h },
-  ];
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const c of corners) {
-    const wx = worldMatrix[0] * c.x + worldMatrix[1] * c.y + worldMatrix[2];
-    const wy = worldMatrix[3] * c.x + worldMatrix[4] * c.y + worldMatrix[5];
-    if (wx < minX) minX = wx;
-    if (wy < minY) minY = wy;
-    if (wx > maxX) maxX = wx;
-    if (wy > maxY) maxY = wy;
-  }
-
-  // AABB 相交检测
+  // 列主序：与 transformPointMat3 / 渲染一致
+  const wb = localBoundsToWorldAABB(localBounds, worldMatrix);
+  const maxX = wb.x + wb.width;
+  const maxY = wb.y + wb.height;
   return !(
     maxX < visible.x ||
-    minX > visible.x + visible.w ||
+    wb.x > visible.x + visible.w ||
     maxY < visible.y ||
-    minY > visible.y + visible.h
+    wb.y > visible.y + visible.h
   );
 }
 
 /**
- * 计算 Group 子树下所有 drawable 子节点的合并包围盒
- * 用于 Group 的命中检测
+ * 计算 Group 子树下 drawable 子节点在 Group 局部坐标系中的合并包围盒
+ * 将子孙 world AABB 逆变换到 group 局部后再合并
  * @param model 元素模型
  * @param groupId group 节点 id
  * @returns 合并包围盒，无 drawable 子节点时返回 null
  */
 function getGroupBounds(model: { getElement(id: string): ElementRecord | undefined; getActiveElements(): ElementRecord[] }, groupId: string): ElementBounds | null {
+  const group = model.getElement(groupId);
+  if (!group) return null;
+  const groupWm = group.worldMatrix as Mat3;
   let bounds: ElementBounds | null = null;
+
   for (const record of model.getActiveElements()) {
+    if (record.id === groupId) continue;
     if (record.parentId !== groupId && !isDescendantOf(model, record, groupId)) continue;
-    if (record.type === 'group') continue;
-    const b = getElementBounds(record);
-    if (!b) continue;
+    if (
+      record.type === 'group'
+      || record.type === 'animation'
+      || record.type === 'clipPath'
+      || record.type === 'filter'
+      || record.type === 'mask'
+      || record.type === 'linearGradient'
+      || record.type === 'radialGradient'
+    ) continue;
+
+    const lbs = estimateLocalBounds(record);
+    if (!lbs) continue;
+    const world = localBoundsToWorldAABB(lbs, record.worldMatrix as Mat3);
+    // 世界 AABB 四角 → group 局部，再取 AABB（保守）
+    const corners = [
+      { x: world.x, y: world.y },
+      { x: world.x + world.width, y: world.y },
+      { x: world.x, y: world.y + world.height },
+      { x: world.x + world.width, y: world.y + world.height },
+    ];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const c of corners) {
+      const inv = worldToLocalPoint(groupWm, c.x, c.y);
+      if (inv.x < minX) minX = inv.x;
+      if (inv.y < minY) minY = inv.y;
+      if (inv.x > maxX) maxX = inv.x;
+      if (inv.y > maxY) maxY = inv.y;
+    }
+    const b: ElementBounds = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
     bounds = bounds ? mergeBounds(bounds, b) : b;
   }
   return bounds;

@@ -1,6 +1,7 @@
 import type { ElementRecord } from '../types';
 import type { Mat3 } from './constants/matrix';
 import { estimateLocalBounds, boundsIntersectViewport } from './bounds';
+import { localBoundsToWorldAABB } from './maths';
 
 /** 空间网格单元 */
 interface SpatialCell {
@@ -83,21 +84,12 @@ class SpatialIndex {
     return out;
   }
 
-  /** 将局部包围盒变换到世界坐标 */
+  /** 将局部包围盒变换到世界坐标（四角，兼容旋转） */
   private toWorldBounds(
     lbs: { x: number; y: number; width: number; height: number },
     matrix: Mat3,
   ): { x: number; y: number; width: number; height: number } {
-    const x0 = lbs.x * matrix[0] + lbs.y * matrix[3] + matrix[6];
-    const y0 = lbs.x * matrix[1] + lbs.y * matrix[4] + matrix[7];
-    const x1 = (lbs.x + lbs.width) * matrix[0] + (lbs.y + lbs.height) * matrix[3] + matrix[6];
-    const y1 = (lbs.x + lbs.width) * matrix[1] + (lbs.y + lbs.height) * matrix[4] + matrix[7];
-    return {
-      x: Math.min(x0, x1),
-      y: Math.min(y0, y1),
-      width: Math.abs(x1 - x0),
-      height: Math.abs(y1 - y0),
-    };
+    return localBoundsToWorldAABB(lbs, matrix);
   }
 
   private cellKey(x: number, y: number): string {

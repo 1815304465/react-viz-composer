@@ -340,10 +340,10 @@ export interface VizEventHandler {
 
 /** 拖拽事件额外信息 */
 export interface VizDragEvent {
-  /** 本次拖拽的累计偏移（从 dragstart 开始） */
+  /** 本次拖拽累计偏移（元素局部坐标，已扣除视口 scale 与祖先 transform） */
   dx: number;
   dy: number;
-  /** 相对上一次 drag 事件的单次偏移 */
+  /** 相对上一次 drag 的单次偏移（元素局部坐标） */
   stepX: number;
   stepY: number;
   originalEvent: MouseEvent;

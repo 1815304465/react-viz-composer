@@ -2,13 +2,12 @@ import type { Model } from '../Model';
 import { VizEvent } from '../types';
 import type {
   VizEventType, VizEventHandler, ElementRecord, RectData, EllipseData, LineData, PathData, TextData, ImageData, PointsData,
-  Transform, Viewport,
+  ClipPathData, MaskData, Viewport,
 } from '../types';
 import { Path2DCache } from '../utils/pathCache';
-import { getGroupBounds, getElementBounds } from '../utils/bounds';
 import { isElementVisible, isPointerEventsEnabled } from '../utils/elements';
-import { sortByPaintOrder } from '../utils/paintOrder';
-import { pointToSegmentDist } from '../utils/maths';
+import { pointToSegmentDist, worldToLocalPoint } from '../utils/maths';
+import { IDENTITY_MAT3, type Mat3 } from '../utils/constants/matrix';
 import { SpatialIndex } from '../utils/spatialIndex';
 import { hitTestPoints } from '../utils/points';
 
@@ -97,20 +96,23 @@ class EventSystem {
 
   /**
    * 同步 Canvas 渲染模式下的元素列表（用于逆序命中检测）
-   * 排除 defs 类节点（渐变/裁剪/滤镜/遮罩），它们不参与命中测试
-   * @param elements 可命中元素列表
+   * 入参顺序须与绘制一致（CanvasRenderer DFS + 兄弟 zIndex），此处不再全局 sort，
+   * 避免深层高 zIndex 子节点压过祖先兄弟的后绘制者。
+   * 排除 defs / 效果容器 / 结构容器（group/animation）：
+   * group 不做实心 AABB 命中，避免挡住镂空区域；事件仍可经子形状冒泡到 group
+   * @param elements 可命中元素列表（绘制顺序）
    * @param visible 视口裁剪区域（世界坐标），null 表示不过滤
    */
   syncCanvasElements(
     elements: ElementRecord[],
     visible: { x: number; y: number; w: number; h: number } | null = null,
   ): void {
-    const drawable = elements.filter(
+    this.canvasElements = elements.filter(
       (e) => !e.removed
         && e.type !== 'linearGradient' && e.type !== 'radialGradient'
-        && e.type !== 'clipPath' && e.type !== 'filter' && e.type !== 'mask',
+        && e.type !== 'clipPath' && e.type !== 'filter' && e.type !== 'mask'
+        && e.type !== 'group' && e.type !== 'animation',
     );
-    this.canvasElements = sortByPaintOrder(drawable);
     this.spatialIndex.rebuild(this.canvasElements, visible);
   }
 
@@ -401,33 +403,49 @@ class EventSystem {
   }
 
   /**
-   * Canvas 命中检测：逆序遍历可绘制元素，坐标转换到局部后做几何测试
-   * 先测 group 包围盒，再测具体形状
+   * Canvas 命中检测：逆序遍历叶子形状，坐标转换到局部后做几何测试
+   * 命中前校验祖先 ClipPath / Mask（裁剪外 / 遮罩外视为未命中）
+   * 空间索引为加速：候选未几何命中时回退全量逆序，避免 AABB 低估漏点
    */
   private hitTestCanvas(offsetX: number, offsetY: number): string | null {
     const { x: vx, y: vy, scale } = this.viewport;
     const worldX = offsetX / scale - vx;
     const worldY = offsetY / scale - vy;
 
+    const paintTopFirst = [...this.canvasElements].reverse();
     const spatialHits = this.spatialIndex.query(worldX, worldY);
-    let searchList: ElementRecord[];
     if (spatialHits.length > 0) {
       const hitIds = new Set(spatialHits.map((r) => r.id));
-      searchList = [...this.canvasElements].reverse().filter((r) => hitIds.has(r.id));
-    } else {
-      searchList = [...this.canvasElements].reverse();
+      const spatialFirst = paintTopFirst.filter((r) => hitIds.has(r.id));
+      const hit = this.hitTestCanvasList(spatialFirst, worldX, worldY);
+      if (hit) return hit;
+      // 空间格子有候选但几何未中：回退测其余节点（防 AABB 低估漏点）
+      return this.hitTestCanvasList(
+        paintTopFirst.filter((r) => !hitIds.has(r.id)),
+        worldX,
+        worldY,
+      );
     }
+    return this.hitTestCanvasList(paintTopFirst, worldX, worldY);
+  }
 
+  /**
+   * 对给定候选列表做几何命中（已按绘制从上到下）
+   * @param searchList 候选（顶层优先）
+   * @param worldX 世界 x
+   * @param worldY 世界 y
+   */
+  private hitTestCanvasList(
+    searchList: ElementRecord[],
+    worldX: number,
+    worldY: number,
+  ): string | null {
     for (const record of searchList) {
       if (!isElementVisible(this.model, record)) continue;
       if (!isPointerEventsEnabled(this.model, record)) continue;
+      if (!this.isInsideClipAndMaskAncestors(record, worldX, worldY)) continue;
 
-      const { lx, ly } = this.toLocalPoint(worldX, worldY, record.data as { transform?: Transform });
-
-      if (record.type === 'group') {
-        if (this.testGroup(record, lx, ly)) return record.id;
-        continue;
-      }
+      const { lx, ly } = this.toLocalPoint(worldX, worldY, record);
 
       if (record.type === 'points') {
         const idx = hitTestPoints(record.data as PointsData, lx, ly);
@@ -442,40 +460,57 @@ class EventSystem {
     return null;
   }
 
-  /** 将世界坐标逆变换为元素局部坐标（逆序：translate → rotate → scale） */
-  private toLocalPoint(worldX: number, worldY: number, data: { transform?: Transform }): { lx: number; ly: number } {
-    let lx = worldX;
-    let ly = worldY;
-    const t = data.transform;
-    if (!t) return { lx, ly };
-
-    lx -= t.x ?? 0;
-    ly -= t.y ?? 0;
-
-    if (t.rotation) {
-      const rad = (-(t.rotation ?? 0) * Math.PI) / 180;
-      const cos = Math.cos(rad);
-      const sin = Math.sin(rad);
-      const rx = lx * cos - ly * sin;
-      const ry = lx * sin + ly * cos;
-      lx = rx;
-      ly = ry;
-    }
-
-    const sx = t.scaleX ?? 1;
-    const sy = t.scaleY ?? 1;
-    if (sx !== 0) lx /= sx;
-    if (sy !== 0) ly /= sy;
-
-    return { lx, ly };
+  /**
+   * 将世界坐标逆变换为元素局部坐标
+   * 使用渲染阶段合成的 worldMatrix，包含祖先 Group 的 translate / rotate / scale
+   */
+  private toLocalPoint(
+    worldX: number,
+    worldY: number,
+    record: ElementRecord,
+  ): { lx: number; ly: number } {
+    const wm = (record.worldMatrix ?? IDENTITY_MAT3) as Mat3;
+    const p = worldToLocalPoint(wm, worldX, worldY);
+    return { lx: p.x, ly: p.y };
   }
 
-  /** Group 命中检测：计算子树包围盒后做 AABB 包含测试 */
-  private testGroup(record: ElementRecord, x: number, y: number): boolean {
-    const bounds = getGroupBounds(this.model, record.id);
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return false;
-    return x >= bounds.x && x <= bounds.x + bounds.width
-      && y >= bounds.y && y <= bounds.y + bounds.height;
+  /**
+   * 沿 parent 链检查点是否落在所有祖先 ClipPath / Mask 形状内
+   * @param record 被测元素
+   * @param worldX 世界 x
+   * @param worldY 世界 y
+   */
+  private isInsideClipAndMaskAncestors(
+    record: ElementRecord,
+    worldX: number,
+    worldY: number,
+  ): boolean {
+    let parentId = record.parentId;
+    while (parentId) {
+      const parent = this.model.getElement(parentId);
+      if (!parent) break;
+      if (parent.type === 'clipPath' || parent.type === 'mask') {
+        const { lx, ly } = this.toLocalPoint(worldX, worldY, parent);
+        if (!this.testClipOrMaskShape(parent, lx, ly)) return false;
+      }
+      parentId = parent.parentId;
+    }
+    return true;
+  }
+
+  /** 测试点是否落在 ClipPath / Mask 声明的裁剪/遮罩形状内 */
+  private testClipOrMaskShape(record: ElementRecord, x: number, y: number): boolean {
+    const data = record.data as ClipPathData | MaskData;
+    switch (data.shapeType) {
+      case 'rect':
+        return this.testRect(data.shapeData as RectData, x, y);
+      case 'ellipse':
+        return this.testEllipse(data.shapeData as EllipseData, x, y);
+      case 'path':
+        return this.testPath(data.shapeData as PathData, x, y);
+      default:
+        return true;
+    }
   }
 
   /** 按元素类型分发到对应的几何命中检测方法 */
@@ -502,33 +537,27 @@ class EventSystem {
 
   /**
    * 矩形命中检测
-   * 支持圆角矩形：四个圆角区域用椭圆方程精确检测，中间区域用 AABB
+   * 圆角：中间主体区直接命中；四角口袋用椭圆方程；主体外且不在圆角内未命中
    */
   private testRect(d: RectData, x: number, y: number): boolean {
     const w = Math.max(0, d.width);
     const h = Math.max(0, d.height);
-    if (d.rx || d.ry) {
-      const rx = Math.min(d.rx ?? 0, w / 2);
-      const ry = Math.min(d.ry ?? 0, h / 2);
-      if (rx > 0 && ry > 0) {
-        if (x < d.x + rx || x > d.x + w - rx || y < d.y + ry || y > d.y + h - ry) {
-          return x >= d.x && x <= d.x + w && y >= d.y && y <= d.y + h;
-        }
-        const corners = [
-          [d.x + rx, d.y + ry],
-          [d.x + w - rx, d.y + ry],
-          [d.x + rx, d.y + h - ry],
-          [d.x + w - rx, d.y + h - ry],
-        ];
-        for (const [cx, cy] of corners) {
-          const nx = (x - cx) / rx;
-          const ny = (y - cy) / ry;
-          if (nx * nx + ny * ny <= 1) return true;
-        }
-        return false;
-      }
-    }
-    return x >= d.x && x <= d.x + w && y >= d.y && y <= d.y + h;
+    if (x < d.x || x > d.x + w || y < d.y || y > d.y + h) return false;
+
+    const rx = Math.min(Math.max(0, d.rx ?? 0), w / 2);
+    const ry = Math.min(Math.max(0, d.ry ?? 0), h / 2);
+    if (rx <= 0 || ry <= 0) return true;
+
+    // 非圆角口袋（十字形主体）
+    if (x >= d.x + rx && x <= d.x + w - rx) return true;
+    if (y >= d.y + ry && y <= d.y + h - ry) return true;
+
+    // 四角口袋：相对最近圆角圆心做椭圆内测
+    const cx = x < d.x + rx ? d.x + rx : d.x + w - rx;
+    const cy = y < d.y + ry ? d.y + ry : d.y + h - ry;
+    const nx = (x - cx) / rx;
+    const ny = (y - cy) / ry;
+    return nx * nx + ny * ny <= 1;
   }
 
   /** 椭圆命中检测：归一化后判断点是否在单位圆内 */

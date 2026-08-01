@@ -5,8 +5,9 @@
  * - 悬停：仅当前节点轻微外晕 + 同色描边；cursor = grab
  * - 拖拽：节点跟随鼠标，cursor = grabbing；松手后以该节点为锚点复活力导向
  *
- * 注意：交互事件绑在可命中的 Ellipse 上（非 Group）。Canvas 空间索引不含
- * group，子节点 pointerEvents="none" 时 Group 无法被点中。
+ * 注意：交互事件绑在可命中的 Ellipse 上（非 Group）。
+ * 铺满画布用坐标映射而非父 Group scale：拖拽 step 是世界坐标，父级 scale
+ * 下还需把增量换算回局部坐标。
  */
 
 import { useMemo, useRef, useState, useEffect } from 'react';
@@ -264,6 +265,10 @@ function KnowledgeGraph(props: Props) {
   const stopRef = useRef<(() => void) | null>(null);
   const draggingIdRef = useRef<string | null>(null);
   const hoveredIdRef = useRef<string | null>(null);
+  const scaleRef = useRef({ sx: 1, sy: 1 });
+  const scaleX = width / W;
+  const scaleY = height / H;
+  scaleRef.current = { sx: scaleX, sy: scaleY };
 
   // ---- 初始仿真 ----
   useEffect(() => {
@@ -313,10 +318,11 @@ function KnowledgeGraph(props: Props) {
           setBodyCursor('grabbing');
         },
         onDrag: (evt) => {
+          const { sx, sy } = scaleRef.current;
           setSimNodes((prev) => {
             const next = prev.map((n) =>
               n.id === node.id
-                ? { ...n, x: n.x + evt.stepX, y: n.y + evt.stepY, vx: 0, vy: 0 }
+                ? { ...n, x: n.x + evt.stepX / sx, y: n.y + evt.stepY / sy, vx: 0, vy: 0 }
                 : n,
             );
             simRef.current = next;
@@ -355,6 +361,14 @@ function KnowledgeGraph(props: Props) {
   const hoveredNode = hoveredId ? NODES.find((n) => n.id === hoveredId) : null;
   const hoveredSim = hoveredId ? simNodes.find((n) => n.id === hoveredId) : null;
 
+  /**
+   * 设计坐标 → 画布坐标（避免父 Group scale 导致命中错位）
+   */
+  const mapPos = (x: number, y: number) => ({
+    x: +(x * scaleX).toFixed(1),
+    y: +(y * scaleY).toFixed(1),
+  });
+
   return (
     <ReactVizComposer engine="canvas" width={width} height={height}>
       <Rect x={0} y={0} width={width} height={height} fill="#fafbfc" />
@@ -381,13 +395,12 @@ function KnowledgeGraph(props: Props) {
         const a = simNodes[si];
         const b = simNodes[ti];
         if (!a || !b) return null;
+        const pa = mapPos(a.x, a.y);
+        const pb = mapPos(b.x, b.y);
         return (
           <Line
             key={`e-${i}`}
-            points={[
-              { x: +a.x.toFixed(1), y: +a.y.toFixed(1) },
-              { x: +b.x.toFixed(1), y: +b.y.toFixed(1) },
-            ]}
+            points={[pa, pb]}
             stroke={`rgba(22, 119, 255, ${+(0.12 + weight * 0.35).toFixed(2)})`}
             strokeWidth={+(0.5 + weight * 1.2).toFixed(1)}
             pointerEvents="none"
@@ -403,8 +416,7 @@ function KnowledgeGraph(props: Props) {
         const r = node.isCore ? 20 : 13;
         const isHovered = hoveredId === node.id;
         const h = nodeHandlers.get(node.id);
-        const cx = +sn.x.toFixed(1);
-        const cy = +sn.y.toFixed(1);
+        const { x: cx, y: cy } = mapPos(sn.x, sn.y);
 
         return (
           <Group key={node.id}>
@@ -434,7 +446,7 @@ function KnowledgeGraph(props: Props) {
             />
             <Text
               x={cx}
-              y={+(sn.y + 1).toFixed(1)}
+              y={cy + 1}
               text={node.label}
               fontSize={node.isCore ? 9 : 7}
               fontWeight={node.isCore ? 'bold' : 'normal'}
@@ -448,31 +460,35 @@ function KnowledgeGraph(props: Props) {
       })}
 
       {/* tooltip */}
-      {hoveredNode && hoveredSim && (
-        <Group pointerEvents="none">
-          <Rect
-            x={hoveredSim.x - 42}
-            y={hoveredSim.y - (hoveredNode.isCore ? 20 : 13) - 26}
-            width={84}
-            height={18}
-            rx={4}
-            fill="rgba(0,0,0,0.78)"
-          />
-          <Text
-            x={hoveredSim.x}
-            y={hoveredSim.y - (hoveredNode.isCore ? 20 : 13) - 15}
-            text={hoveredNode.label}
-            fontSize={10}
-            fontWeight="bold"
-            fill="#fff"
-            textAlign="middle"
-            textBaseline="middle"
-          />
-        </Group>
-      )}
+      {hoveredNode && hoveredSim && (() => {
+        const p = mapPos(hoveredSim.x, hoveredSim.y);
+        const tipY = p.y - (hoveredNode.isCore ? 20 : 13) - 26;
+        return (
+          <Group pointerEvents="none">
+            <Rect
+              x={p.x - 42}
+              y={tipY}
+              width={84}
+              height={18}
+              rx={4}
+              fill="rgba(0,0,0,0.78)"
+            />
+            <Text
+              x={p.x}
+              y={tipY + 11}
+              text={hoveredNode.label}
+              fontSize={10}
+              fontWeight="bold"
+              fill="#fff"
+              textAlign="middle"
+              textBaseline="middle"
+            />
+          </Group>
+        );
+      })()}
 
       {/* 图例 */}
-      <Group x={width - 240} y={H - 28} pointerEvents="none">
+      <Group x={width - 240} y={height - 28} pointerEvents="none">
         {Object.entries(GROUP_COLORS).map(([group, color], i) => (
           <Group key={group} x={i * 42}>
             <Ellipse cx={0} cy={5} rx={4} ry={4} fill={color} />

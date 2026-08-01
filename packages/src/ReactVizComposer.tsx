@@ -31,7 +31,7 @@ interface Props {
   interactiveViewport?: boolean;
   /** 视口变化回调 */
   onViewportChange?: (viewport: Viewport) => void;
-  /** 视口裁剪边距 */
+  /** 视口裁剪边距（CSS 像素）；未传时四边默认各为画布宽/高的 20%；四边传 0 关闭裁剪 */
   cullMargin?: ViewportCullMargin;
   /** 根画布事件（与形状组件事件 props 一致，在空白区域触发） */
   canvasEventProps?: ShapeEventProps;
@@ -61,19 +61,25 @@ function ReactVizComposer(props: Props) {
   const graphRef = useRef<Graph | null>(null);
   const sceneTreeRef = useRef<SceneTree | null>(null);
   const prevSizeRef = useRef({ width: 0, height: 0 });
+  const viewportPropRef = useRef(viewport);
+  const onViewportChangeRef = useRef(onViewportChange);
   const [internalViewport, setInternalViewport] = useState<Viewport>({ x: 0, y: 0, scale: 1 });
   const effectiveViewport = viewport ?? internalViewport;
+
+  viewportPropRef.current = viewport;
+  onViewportChangeRef.current = onViewportChange;
 
   // SceneTree 在 useMemo 中创建（不依赖 DOM，构造时无副作用）
   const sceneTree = useMemo(() => new SceneTree(), []);
 
-  // Graph 在 useMemo 中创建（构造时不传 container）
-  const graph = useMemo(() => new Graph({ engine, cullMargin }), [engine, cullMargin]);
+  // Graph 仅随 engine 重建；cullMargin 通过 setCullMargin 热更新，避免对象引用变化 remount
+  const graph = useMemo(() => new Graph({ engine, cullMargin }), [engine]);
 
   // 共享 sceneTree 引用
   sceneTreeRef.current = sceneTree;
 
   // useEffect 挂载 Graph 到 DOM
+  // 注意：viewport / onViewportChange / canvasEventProps 走 ref，避免受控视口每次平移 remount
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -81,16 +87,16 @@ function ReactVizComposer(props: Props) {
     graphRef.current = graph;
     graph.mount(container);
 
-    // 应用视口裁剪边距（使用容器实际尺寸）
-    if (cullMargin) {
+    // 应用视口裁剪边距：未传时用空对象 → 四边默认各 20% 画布尺寸
+    {
       const rect = container.getBoundingClientRect();
-      graph.setCullMargin(cullMargin, rect.width, rect.height);
+      graph.setCullMargin(cullMargin ?? {}, rect.width, rect.height);
     }
 
     if (interactiveViewport) {
       const applyViewport = (next: Viewport) => {
-        if (viewport === undefined) setInternalViewport(next);
-        onViewportChange?.(next);
+        if (viewportPropRef.current === undefined) setInternalViewport(next);
+        onViewportChangeRef.current?.(next);
         graphRef.current?.setViewport(next);
       };
 
@@ -120,14 +126,6 @@ function ReactVizComposer(props: Props) {
       sceneTree.flushUpdates();
     });
 
-    // 注册根事件处理器：将 canvasEventProps 转为 EventSystem 事件表并注入
-    if (canvasEventProps) {
-      const rootEvents = buildShapeEvents(
-        pickShapeEventProps(canvasEventProps as Record<string, unknown>),
-      );
-      graph.eventSystem.setRootEventHandler(rootEvents);
-    }
-
     // 订阅 SceneTree：结构变更全量同步，数据更新增量同步
     const unsubScene = sceneTree.subscribe((reason) => {
       graphRef.current?.applySceneChange(sceneTree, reason);
@@ -140,7 +138,28 @@ function ReactVizComposer(props: Props) {
       graph.dispose();
       graphRef.current = null;
     };
-  }, [engine, graph, interactiveViewport, onViewportChange, viewport, sceneTree]);
+  }, [engine, graph, interactiveViewport, sceneTree]);
+
+  // cullMargin 变化时热更新，不重建 Graph；undefined → 默认 20%
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !graphRef.current) return;
+    const rect = container.getBoundingClientRect();
+    graphRef.current.setCullMargin(cullMargin ?? {}, rect.width, rect.height);
+  }, [cullMargin]);
+
+  // 根画布事件可随 props 更新，无需 remount Graph
+  useEffect(() => {
+    if (!graphRef.current) return;
+    if (!canvasEventProps) {
+      graphRef.current.eventSystem.setRootEventHandler({});
+      return;
+    }
+    const rootEvents = buildShapeEvents(
+      pickShapeEventProps(canvasEventProps as Record<string, unknown>),
+    );
+    graphRef.current.eventSystem.setRootEventHandler(rootEvents);
+  }, [canvasEventProps, graph]);
 
   useEffect(() => {
     graphRef.current?.setViewport(effectiveViewport);
@@ -159,10 +178,8 @@ function ReactVizComposer(props: Props) {
 
         prevSizeRef.current = { width: w, height: h };
         graphRef.current?.resize(w, h);
-        // 容器尺寸变化时重新应用裁剪边距
-        if (cullMargin) {
-          graphRef.current?.setCullMargin(cullMargin, w, h);
-        }
+        // 容器尺寸变化时重新应用裁剪边距（未传 → 默认 20%）
+        graphRef.current?.setCullMargin(cullMargin ?? {}, w, h);
       }, debounceWait),
     [debounceWait, cullMargin],
   );

@@ -34,7 +34,7 @@ class SVGRenderer extends Renderer {
   private svg!: SVGSVGElement;
   /** <defs> 容器：存放渐变、clipPath、filter、mask 等定义 */
   private defs!: SVGDefsElement;
-  /** 视口变换组 <g>：应用 translate + scale 变换 */
+  /** 视口变换组 <g>：应用 scale(s) translate(x,y)，与 Canvas 一致 */
   private viewportGroup!: SVGGElement;
   /** 节点 id → SVG DOM 元素的映射 */
   private elementMap: Map<string, SVGElement> = new Map();
@@ -99,11 +99,15 @@ class SVGRenderer extends Renderer {
     return svg;
   }
 
-  /** 更新 viewportGroup 的 transform 属性（translate + scale） */
+  /**
+   * 更新 viewportGroup 的 transform
+   * 与 Canvas 一致：screen = scale * (world + v)
+   * SVG 变换右乘顺序 ⇒ scale(s) translate(x,y)
+   */
   private updateViewportGroup(): void {
     if (!this.viewportGroup) return;
     const { x, y, scale } = this.viewport;
-    this.viewportGroup.setAttribute('transform', `translate(${x}, ${y}) scale(${scale})`);
+    this.viewportGroup.setAttribute('transform', `scale(${scale}) translate(${x}, ${y})`);
   }
 
   /** 设置视口：更新 viewport 值并同步到 DOM */
@@ -125,7 +129,7 @@ class SVGRenderer extends Renderer {
 
   /**
    * 开始拖拽：注册全局 pointermove/pointerup 监听器
-   * 将屏幕像素位移转换为视口坐标系位移（除以 scale）
+   * 屏幕位移 → 元素局部坐标（扣除 viewport.scale 与祖先 worldMatrix）
    * @param id 拖拽元素 id
    * @param onDrag 拖拽移动回调
    * @param onEnd 拖拽结束回调
@@ -144,22 +148,21 @@ class SVGRenderer extends Renderer {
 
     const globalMove = (e: PointerEvent) => {
       if (this.dragElementId !== id) return;
-      const invScale = 1 / this.viewport.scale;
-      const dx = (e.clientX - this.dragStartX) * invScale;
-      const dy = (e.clientY - this.dragStartY) * invScale;
-      const stepX = (e.clientX - this.dragLastX) * invScale;
-      const stepY = (e.clientY - this.dragLastY) * invScale;
+      const total = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+      const step = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragLastX, e.clientY - this.dragLastY);
       this.dragLastX = e.clientX;
       this.dragLastY = e.clientY;
-      this.dragOnDrag?.({ dx, dy, stepX, stepY, originalEvent: e, elementId: id });
+      this.dragOnDrag?.({
+        dx: total.x, dy: total.y, stepX: step.x, stepY: step.y, originalEvent: e, elementId: id,
+      });
     };
 
     const globalUp = (e: PointerEvent) => {
       if (this.dragElementId !== id) return;
-      const invScale = 1 / this.viewport.scale;
-      const dx = (e.clientX - this.dragStartX) * invScale;
-      const dy = (e.clientY - this.dragStartY) * invScale;
-      this.dragOnEnd?.({ dx, dy, stepX: 0, stepY: 0, originalEvent: e, elementId: id });
+      const total = this.screenDeltaToLocalDragDelta(id, e.clientX - this.dragStartX, e.clientY - this.dragStartY);
+      this.dragOnEnd?.({
+        dx: total.x, dy: total.y, stepX: 0, stepY: 0, originalEvent: e, elementId: id,
+      });
       this.dispatchDragVizEvent('dragend', id, e);
       this.stopDrag();
     };

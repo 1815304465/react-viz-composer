@@ -192,56 +192,59 @@ export function ParticleFlow({ width = WIDTH, height = HEIGHT }: Props) {
     () => CHANNELS.map((ch) => bezierPathStr(ch.p0, ch.p1, ch.p2, ch.p3)),
     [],
   );
+  const scaleX = width / WIDTH;
+  const scaleY = height / HEIGHT;
 
   return (
     <ReactVizComposer engine="canvas" width={width} height={height}>
       <Rect x={0} y={0} width={width} height={height} fill="#0a0e27" />
+      <Group scaleX={scaleX} scaleY={scaleY}>
+        <Text x={WIDTH / 2} y={22} text="物理粒子流仿真" fontSize={15} fontWeight="bold" fill="rgba(255,255,255,0.85)" textAlign="middle" />
+        <Text x={WIDTH / 2} y={40} text={`${TOTAL_PARTICLES} 粒子 · ${CHANNELS.length} 流道 · 物理引擎驱动`} fontSize={9} fill="rgba(255,255,255,0.35)" textAlign="middle" />
 
-      <Text x={width / 2} y={22} text="物理粒子流仿真" fontSize={15} fontWeight="bold" fill="rgba(255,255,255,0.85)" textAlign="middle" />
-      <Text x={width / 2} y={40} text={`${TOTAL_PARTICLES} 粒子 · ${CHANNELS.length} 流道 · 物理引擎驱动`} fontSize={9} fill="rgba(255,255,255,0.35)" textAlign="middle" />
-
-      {/* 轨迹线 */}
-      {CHANNELS.map((ch, i) => (
-        <Path key={`track-${i}`} d={trackPaths[i]} fill="none" stroke={ch.color} strokeWidth={1} opacity={0.1} />
-      ))}
-
-      {/* 端点 */}
-      <Ellipse cx={40} cy={110} rx={7} ry={7} fill="#1677ff" opacity={0.4} />
-      <Ellipse cx={40} cy={200} rx={7} ry={7} fill="#52c41a" opacity={0.4} />
-      <Ellipse cx={40} cy={280} rx={7} ry={7} fill="#fa8c16" opacity={0.4} />
-      <Ellipse cx={40} cy={70} rx={7} ry={7} fill="#722ed1" opacity={0.4} />
-      <Ellipse cx={WIDTH - 40} cy={110} rx={9} ry={9} fill="none" stroke="#1677ff" strokeWidth={2} opacity={0.2} />
-      <Ellipse cx={WIDTH - 40} cy={200} rx={9} ry={9} fill="none" stroke="#52c41a" strokeWidth={2} opacity={0.2} />
-      <Ellipse cx={WIDTH - 40} cy={280} rx={9} ry={9} fill="none" stroke="#fa8c16" strokeWidth={2} opacity={0.2} />
-      <Ellipse cx={WIDTH - 40} cy={70} rx={9} ry={9} fill="none" stroke="#722ed1" strokeWidth={2} opacity={0.2} />
-
-      <Text x={40} y={95} text="源集群" fontSize={8} fill="rgba(255,255,255,0.2)" textAlign="middle" />
-      <Text x={WIDTH - 40} y={95} text="目标" fontSize={8} fill="rgba(255,255,255,0.2)" textAlign="middle" />
-
-      {/* 粒子 */}
-      {state.particles.map((p, i) => {
-        let channelIdx = 0;
-        let acc = 0;
-        for (let ci = 0; ci < CHANNELS.length; ci++) {
-          acc += CHANNELS[ci].particleCount;
-          if (i < acc) { channelIdx = ci; break; }
-        }
-        const color = CHANNELS[channelIdx].color;
-        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-        const alpha = 0.25 + Math.min(0.5, speed / MAX_SPEED * 0.5);
-        const r = 1.5 + p.mass * 1.5;
-
-        return <Ellipse key={`p-${i}`} cx={p.x} cy={p.y} rx={r} ry={r} fill={color} opacity={+alpha.toFixed(2)} />;
-      })}
-
-      {/* 图例 */}
-      <Group x={width - 220} y={height - 28}>
+        {/* 轨迹线 */}
         {CHANNELS.map((ch, i) => (
-          <Group key={i} x={i * 52}>
-            <Rect x={0} y={2} width={6} height={6} rx={2} fill={ch.color} opacity={0.8} />
-            <Text x={10} y={7} text={`流 ${i + 1}`} fontSize={8} fill="rgba(255,255,255,0.3)" />
-          </Group>
+          <Path key={`track-${i}`} d={trackPaths[i]} fill="none" stroke={ch.color} strokeWidth={1} opacity={0.1} />
         ))}
+
+        {/* 端点 */}
+        <Ellipse cx={40} cy={110} rx={7} ry={7} fill="#1677ff" opacity={0.4} />
+        <Ellipse cx={40} cy={200} rx={7} ry={7} fill="#52c41a" opacity={0.4} />
+        <Ellipse cx={40} cy={280} rx={7} ry={7} fill="#fa8c16" opacity={0.4} />
+        <Ellipse cx={40} cy={70} rx={7} ry={7} fill="#722ed1" opacity={0.4} />
+        <Ellipse cx={WIDTH - 40} cy={110} rx={9} ry={9} fill="none" stroke="#1677ff" strokeWidth={2} opacity={0.2} />
+        <Ellipse cx={WIDTH - 40} cy={200} rx={9} ry={9} fill="none" stroke="#52c41a" strokeWidth={2} opacity={0.2} />
+        <Ellipse cx={WIDTH - 40} cy={280} rx={9} ry={9} fill="none" stroke="#fa8c16" strokeWidth={2} opacity={0.2} />
+        <Ellipse cx={WIDTH - 40} cy={70} rx={9} ry={9} fill="none" stroke="#722ed1" strokeWidth={2} opacity={0.2} />
+
+        <Text x={40} y={95} text="源集群" fontSize={8} fill="rgba(255,255,255,0.2)" textAlign="middle" />
+        <Text x={WIDTH - 40} y={95} text="目标" fontSize={8} fill="rgba(255,255,255,0.2)" textAlign="middle" />
+
+        {/* 粒子 */}
+        {state.particles.map((p, i) => {
+          let channelIdx = 0;
+          let acc = 0;
+          for (let ci = 0; ci < CHANNELS.length; ci++) {
+            acc += CHANNELS[ci].particleCount;
+            if (i < acc) { channelIdx = ci; break; }
+          }
+          const color = CHANNELS[channelIdx].color;
+          const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+          const alpha = 0.25 + Math.min(0.5, speed / MAX_SPEED * 0.5);
+          const r = 1.5 + p.mass * 1.5;
+
+          return <Ellipse key={`p-${i}`} cx={p.x} cy={p.y} rx={r} ry={r} fill={color} opacity={+alpha.toFixed(2)} />;
+        })}
+
+        {/* 图例 */}
+        <Group x={WIDTH - 220} y={HEIGHT - 28}>
+          {CHANNELS.map((ch, i) => (
+            <Group key={i} x={i * 52}>
+              <Rect x={0} y={2} width={6} height={6} rx={2} fill={ch.color} opacity={0.8} />
+              <Text x={10} y={7} text={`流 ${i + 1}`} fontSize={8} fill="rgba(255,255,255,0.3)" />
+            </Group>
+          ))}
+        </Group>
       </Group>
     </ReactVizComposer>
   );

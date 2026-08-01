@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { debounce } from 'lodash-es';
 import { ViewportRender } from './components/ViewportRender';
+import { ScenarioDemoFrame } from './components/ScenarioDemoFrame';
 import { LiveDataProvider, useLiveMode } from './live';
 import { HomePage } from './pages/HomePage';
 import { DocsPage } from './pages/DocsPage';
@@ -103,12 +104,14 @@ import {
   FlightLinesChartDemo,
 } from './components/ChartDemos';
 import {
-  NetworkTopology,
+  InteractiveTopology,
   IndustrialHMI,
   RealtimeDashboard,
   ParticleFlow,
   SmartCampus,
   KnowledgeGraph,
+  ScatterplotMatrix,
+  MusicVisualizer,
 } from './scenarios';
 
 const { Header, Content } = Layout;
@@ -480,12 +483,16 @@ const DOC_SECTIONS: SearchItem[] = [
 
 /** 场景搜索索引 */
 const SCENARIO_SECTIONS: SearchItem[] = [
-  { id: 'sc-topology', keywords: ['网络拓扑', 'Leaf-Spine', '交换机', '拓扑', 'topology', '网络', 'spine', 'leaf'], value: '企业网络拓扑', route: '/scenarios', anchorId: 'scenario-topology', type: 'doc', category: '场景', name: '企业网络拓扑', description: 'Leaf-Spine 网络架构拓扑可视化' },
-  { id: 'sc-hmi', keywords: ['工业', 'HMI', '产线', '组态', '监控', 'industrial', '工厂', '设备'], value: '工业产线 HMI', route: '/scenarios', anchorId: 'scenario-hmi', type: 'doc', category: '场景', name: '工业产线 HMI', description: '工厂产线设备状态监控界面' },
+  { id: 'sc-hmi', keywords: ['工业', 'HMI', '产线', '组态', '监控', 'industrial', '工厂', '设备'], value: '工业产线 HMI', route: '/scenarios', anchorId: 'scenario-hmi', type: 'doc', category: '场景', name: '工业产线 HMI', description: '产线设备监控，支持点击详情/拖拽/可选缩放平移' },
   { id: 'sc-dashboard', keywords: ['大屏', 'dashboard', '实时', '仪表盘', '监控', 'realtime', '数据大屏'], value: '实时数据大屏', route: '/scenarios', anchorId: 'scenario-dashboard', type: 'doc', category: '场景', name: '实时数据大屏', description: '多指标实时监控仪表盘' },
   { id: 'sc-particle', keywords: ['粒子', '粒子系统', 'particle', '流动', '数据流', '动画', '粒子动画'], value: '粒子流动系统', route: '/scenarios', anchorId: 'scenario-particle', type: 'doc', category: '场景', name: '粒子流动系统', description: '大规模粒子动画数据流模拟' },
   { id: 'sc-campus', keywords: ['智慧园区', '园区', '楼宇', '停车', 'campus', 'smart', '安防', '能耗'], value: '智慧园区', route: '/scenarios', anchorId: 'scenario-campus', type: 'doc', category: '场景', name: '智慧园区', description: '楼宇/能源/停车/安防一体化概览' },
   { id: 'sc-kg', keywords: ['知识图谱', '知识网络', '社交网络', 'knowledge', 'graph', '图谱', '实体', '关系'], value: '知识图谱', route: '/scenarios', anchorId: 'scenario-kg', type: 'doc', category: '场景', name: '知识图谱', description: '科技领域实体关系图谱' },
+  { id: 'sc-interactive-topology', keywords: ['交互拓扑', '网络拓扑', 'Leaf-Spine', '交换机', '拖拽', '拓扑', '交互', '选择', '详情', 'interactive', 'topology', 'drag', 'zoom', '网络', 'spine', 'leaf'], value: '交互式网络拓扑', route: '/scenarios', anchorId: 'scenario-interactive-topology', type: 'doc', category: '场景', name: '交互式网络拓扑', description: '节点拖拽/选择/详情侧边栏，可选画布缩放平移' },
+  { id: 'sc-splom', keywords: ['散点图矩阵', 'SPLOM', 'Brush', '框选', '联动', '维度', '散点', 'scatterplot', 'matrix'], value: '散点图矩阵', route: '/scenarios', anchorId: 'scenario-splom', type: 'doc', category: '场景', name: '散点图矩阵', description: '多维度散点图矩阵，Brush 框选联动高亮' },
+  { id: 'sc-music', keywords: ['音乐', '可视化', '频谱', '音频', 'music', 'visualizer', '波形', '频谱柱', '节拍', 'audio', 'spectrum'], value: '音乐可视化', route: '/scenarios', anchorId: 'scenario-music', type: 'doc', category: '场景', name: '音乐可视化', description: '模拟音频频谱可视化，波形/频谱柱/圆形频谱' },
+  // 二维画板：代码保留，暂不展示
+  // { id: 'sc-drawing-board', keywords: ['画板', '绘图', '图层', '手绘', 'path', 'drawing', 'board', 'canvas', '设计', '矢量'], value: '二维画板', route: '/scenarios', anchorId: 'scenario-drawing-board', type: 'doc', category: '场景', name: '二维画板', description: '形状/手绘/文本/图层/样式配置/无限画布' },
 ];
 
 function buildChartSearchItems(): SearchItem[] {
@@ -924,58 +931,74 @@ interface ScenarioEntry {
   title: string;
   description: string;
   tags: string[];
-  demo: React.ReactNode;
+  /** 按容器实测尺寸渲染，铺满卡片宽度 */
+  render: (size: { width: number; height: number }) => React.ReactNode;
   /** 渲染区高度 */
   demoHeight?: number;
 }
 
-const SCENARIO_CARD_W = 680;
 const SCENARIO_CARD_H = 440;
 const SCENARIO_CARD_GAP = 32;
 
 const SCENARIOS: ScenarioEntry[] = [
   {
-    id: 'topology',
-    title: '企业网络拓扑',
-    description: 'Leaf-Spine 数据中心网络架构可视化，展示交换机节点与光纤链路，支持数据包流动动画。',
-    tags: ['网络', '拓扑', 'Leaf-Spine'],
-    demo: <NetworkTopology width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
-  },
-  {
     id: 'hmi',
     title: '工业产线 HMI',
-    description: '工厂产线设备状态监控界面，展示熔炉、CNC、传送带等设备运行状态与实时数据。',
-    tags: ['工业', 'HMI', '组态'],
-    demo: <IndustrialHMI width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+    description: '工厂产线设备监控：点击设备查看详情面板，拖拽设备重排，可选画布缩放平移与重置视图。',
+    tags: ['工业', 'HMI', '组态', '交互', '拖拽'],
+    render: ({ width, height }) => <IndustrialHMI width={width} height={height} />,
   },
   {
     id: 'dashboard',
     title: '实时数据大屏',
     description: '多指标监控仪表盘，包含 KPI 卡片、柱状图、趋势线和环形进度，模拟生产环境大屏。',
     tags: ['大屏', '实时', '仪表盘'],
-    demo: <RealtimeDashboard width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+    render: ({ width, height }) => <RealtimeDashboard width={width} height={height} />,
   },
   {
     id: 'particle',
     title: '粒子流动系统',
     description: '47 个粒子沿 4 条贝塞尔曲线轨迹流动，模拟数据流传输，展示 Animation compute 能力。',
     tags: ['粒子', '动画', '数据流'],
-    demo: <ParticleFlow width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+    render: ({ width, height }) => <ParticleFlow width={width} height={height} />,
   },
   {
     id: 'campus',
     title: '智慧园区',
     description: '园区一体化概览大屏，集成楼宇入驻率、能耗监控、停车位占用和环境传感器数据。',
     tags: ['园区', '楼宇', '停车'],
-    demo: <SmartCampus width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+    render: ({ width, height }) => <SmartCampus width={width} height={height} />,
   },
   {
     id: 'kg',
     title: '知识图谱',
     description: '科技领域 15 个实体关系图谱：悬停高亮关联边，拖拽节点后以该点为锚自动力导向重布局。',
     tags: ['知识图谱', '拖拽', '力导向'],
-    demo: <KnowledgeGraph width={SCENARIO_CARD_W} height={SCENARIO_CARD_H} />,
+    render: ({ width, height }) => <KnowledgeGraph width={width} height={height} />,
   },
+  {
+    id: 'interactive-topology',
+    title: '交互式网络拓扑',
+    description: 'Leaf-Spine 架构完全交互版：点击节点打开右侧详情面板，拖拽叶/ToR 节点重排，可选画布缩放平移与重置视图。',
+    tags: ['网络', '拓扑', '交互', '拖拽', '缩放'],
+    render: ({ width, height }) => <InteractiveTopology width={width} height={height} />,
+  },
+  {
+    id: 'splom',
+    title: '散点图矩阵 (SPLOM)',
+    description: '5×5 多维度散点图矩阵，支持 Brush 框选联动高亮、悬停数据提示和维度间相关系数展示，演示关联视图 / 交叉过滤。',
+    tags: ['SPLOM', '散点', 'Brush', '联动'],
+    render: ({ width, height }) => <ScatterplotMatrix width={width} height={height} />,
+    demoHeight: 620,
+  },
+  {
+    id: 'music',
+    title: '音乐可视化',
+    description: '模拟音频频谱可视化：64 频段频谱柱带倒影、平滑波形曲线、圆形频谱环绕 + 节拍脉冲，播放/暂停控制与进度条。',
+    tags: ['音乐', '可视化', '频谱', '音频', '暗色'],
+    render: ({ width, height }) => <MusicVisualizer width={width} height={height} />,
+  },
+  // 二维画板：源码保留在 apps/demo/src/scenarios/drawing-board，暂不在场景页展示
 ];
 
 function ScenariosPage() {
@@ -984,7 +1007,7 @@ function ScenariosPage() {
   }, []);
 
   return (
-    <div style={{ maxWidth: SCENARIO_CARD_W + 80, margin: '0 auto', padding: '40px 32px 80px' }}>
+    <div style={{ maxWidth: 1120, margin: '0 auto', padding: '40px 32px 80px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 600, color: '#141414', margin: '0 0 8px' }}>
         场景可视化
       </h1>
@@ -1008,18 +1031,12 @@ function ScenariosPage() {
               border: '1px solid #f0f0f0',
             }}
           >
-            {/* 渲染区 */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#fafafa',
-                padding: '8px 0',
-              }}
-            >
-              <ViewportRender minHeight={SCENARIO_CARD_H}>
-                {scenario.demo}
+            {/* 渲染区：铺满卡片宽度 */}
+            <div style={{ background: '#fafafa', width: '100%' }}>
+              <ViewportRender minHeight={scenario.demoHeight ?? SCENARIO_CARD_H}>
+                <ScenarioDemoFrame height={scenario.demoHeight ?? SCENARIO_CARD_H}>
+                  {(size) => scenario.render(size)}
+                </ScenarioDemoFrame>
               </ViewportRender>
             </div>
             {/* 信息区 */}

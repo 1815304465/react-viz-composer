@@ -52,4 +52,125 @@ function pointToSegmentDist(px: number, py: number, x1: number, y1: number, x2: 
   return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
 }
 
-export { transformToMatrix, multiplyMat3, pointToSegmentDist };
+/**
+ * 仿射 3×3 矩阵求逆（列主序，最后一行应为 0,0,1）
+ * @param out 输出矩阵
+ * @param m 输入矩阵
+ * @returns 是否可逆
+ */
+function invertMat3(out: Mat3, m: Mat3): boolean {
+  // 对 2D 仿射：| a c tx |
+  //            | b d ty |
+  //            | 0 0 1  |
+  const a = m[0];
+  const b = m[1];
+  const c = m[3];
+  const d = m[4];
+  const tx = m[6];
+  const ty = m[7];
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-12) return false;
+  const invDet = 1 / det;
+  out[0] = d * invDet;
+  out[1] = -b * invDet;
+  out[2] = 0;
+  out[3] = -c * invDet;
+  out[4] = a * invDet;
+  out[5] = 0;
+  out[6] = (c * ty - d * tx) * invDet;
+  out[7] = (b * tx - a * ty) * invDet;
+  out[8] = 1;
+  return true;
+}
+
+/**
+ * 用矩阵变换点（列主序仿射）
+ * @param m 变换矩阵
+ * @param x 输入 x
+ * @param y 输入 y
+ */
+function transformPointMat3(m: Mat3, x: number, y: number): { x: number; y: number } {
+  return {
+    x: m[0] * x + m[3] * y + m[6],
+    y: m[1] * x + m[4] * y + m[7],
+  };
+}
+
+/**
+ * 用矩阵的逆将世界坐标变换到局部坐标
+ * @param m 世界矩阵（parent × local）
+ * @param worldX 世界 x
+ * @param worldY 世界 y
+ */
+function worldToLocalPoint(m: Mat3, worldX: number, worldY: number): { x: number; y: number } {
+  const inv = new Float32Array(9) as Mat3;
+  if (!invertMat3(inv, m)) return { x: worldX, y: worldY };
+  return transformPointMat3(inv, worldX, worldY);
+}
+
+/**
+ * 将世界空间位移转换为局部空间位移（忽略平移，只取线性部分逆）
+ * 用于拖拽：屏幕增量 → 世界增量后再换到元素局部坐标
+ * @param m 元素 worldMatrix
+ * @param worldDx 世界 dx
+ * @param worldDy 世界 dy
+ */
+function worldDeltaToLocalDelta(
+  m: Mat3,
+  worldDx: number,
+  worldDy: number,
+): { x: number; y: number } {
+  const a = m[0];
+  const b = m[1];
+  const c = m[3];
+  const d = m[4];
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-12) return { x: worldDx, y: worldDy };
+  const invDet = 1 / det;
+  return {
+    x: (d * worldDx - c * worldDy) * invDet,
+    y: (-b * worldDx + a * worldDy) * invDet,
+  };
+}
+
+/**
+ * 将局部包围盒 4 角经列主序矩阵变换后取世界 AABB
+ * @param local 局部包围盒 {x,y,w,h} 或 {x,y,width,height}
+ * @param matrix 世界矩阵
+ */
+function localBoundsToWorldAABB(
+  local: { x: number; y: number; w?: number; h?: number; width?: number; height?: number },
+  matrix: Mat3,
+): { x: number; y: number; width: number; height: number } {
+  const w = local.w ?? local.width ?? 0;
+  const h = local.h ?? local.height ?? 0;
+  const corners = [
+    { x: local.x, y: local.y },
+    { x: local.x + w, y: local.y },
+    { x: local.x, y: local.y + h },
+    { x: local.x + w, y: local.y + h },
+  ];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const c of corners) {
+    const p = transformPointMat3(matrix, c.x, c.y);
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+export {
+  transformToMatrix,
+  multiplyMat3,
+  pointToSegmentDist,
+  invertMat3,
+  transformPointMat3,
+  worldToLocalPoint,
+  worldDeltaToLocalDelta,
+  localBoundsToWorldAABB,
+};
